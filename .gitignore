@@ -1,0 +1,14 @@
+node_modules/
+*.log
+npm-debug.log*
+.DS_Store
+reports/*.json
+reports/*.html
+*.json.bak
+
+# Local font clones (fonts are fetched from fonts.sanchaya.net at runtime)
+font-checker/fonts/kan_gmp/
+font-checker/fonts/kan_gtn/
+font-checker/fonts/kan_kittel/
+font-checker/fonts/kan_wmp/
+font-checker/fonts/kan_bandipur/

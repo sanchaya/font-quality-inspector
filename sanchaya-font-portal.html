@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sanchaya Font Quality Portal · ಫಾಂಟ್ ಗುಣಮಟ್ಟ ತಪಾಸಣೆ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
+<style>
+:root{
+  --bg:#f8fafc;--surface:#fff;--border:#e2e8f0;
+  --text:#0f172a;--muted:#64748b;--muted2:#94a3b8;
+  --pass:#16a34a;--fail:#dc2626;--warn:#d97706;--info:#2563eb;
+  --pass-bg:#dcfce7;--fail-bg:#fee2e2;--warn-bg:#fef9c3;--info-bg:#dbeafe;
+  --header:#0f172a;--r:10px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+
+/* ── Header ── */
+.hdr{background:var(--header);color:#fff;padding:14px 28px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:0 1px 0 rgba(255,255,255,.08)}
+.hdr-title{font-size:15px;font-weight:700}
+.hdr-sub{font-size:11px;color:var(--muted2);margin-top:1px}
+.hdr-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.btn{padding:6px 14px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-ghost{background:rgba(255,255,255,.1);color:#fff}.btn-ghost:hover{background:rgba(255,255,255,.18)}
+
+/* ── Summary bar ── */
+.summary-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+.summary-stat{text-align:center}
+.summary-num{font-size:22px;font-weight:800;line-height:1}
+.summary-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+
+/* ── Layout ── */
+.page{display:flex;min-height:calc(100vh - 113px)}
+.sidebar{width:340px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;height:calc(100vh - 113px);position:sticky;top:113px}
+.detail-pane{flex:1;overflow-y:auto;height:calc(100vh - 113px)}
+.no-select{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);gap:12px;font-size:15px}
+.no-select-icon{font-size:48px;opacity:.3}
+
+/* ── Toolbar strip ── */
+.toolbar-strip{background:var(--bg);border-bottom:1px solid var(--border);padding:8px 28px;display:flex;gap:10px;align-items:center}
+.toolbar-lbl{font-size:11px;font-weight:600;color:var(--muted)}
+select{padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text)}
+
+/* ── Font List ── */
+.family-section{border-bottom:1px solid var(--border)}
+.family-header{padding:10px 16px 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border)}
+.font-item{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:.12s;border-left:3px solid transparent}
+.font-item:last-child{border-bottom:none}
+.font-item:hover{background:var(--bg)}
+.font-item.active{background:#eff6ff;border-left-color:#3b82f6}
+.fi-badge{width:40px;height:40px;border-radius:50%;border:3px solid currentColor;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:800;line-height:1}
+.fi-info{flex:1;min-width:0}
+.fi-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-sub{font-size:11px;color:var(--muted);display:flex;gap:5px;margin-top:2px;flex-wrap:wrap}
+.fi-mini-pill{font-size:10px;font-weight:600;padding:1px 5px;border-radius:8px}
+.pi-err{background:var(--fail-bg);color:var(--fail)}
+.pi-warn{background:var(--warn-bg);color:var(--warn)}
+.pi-ok{background:var(--pass-bg);color:var(--pass)}
+.pi-info{background:var(--info-bg);color:var(--info)}
+.fi-spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Loading overlay ── */
+#loading-overlay{display:none;position:fixed;inset:0;background:rgba(248,250,252,.94);z-index:200;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.lo-title{font-size:17px;font-weight:700}
+.lo-progress{width:340px;background:var(--border);border-radius:6px;height:6px;overflow:hidden}
+.lo-bar{height:100%;background:#3b82f6;border-radius:6px;transition:width .3s}
+.lo-status{font-size:12px;color:var(--muted);text-align:center;max-width:340px}
+.lo-fonts{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:400px;margin-top:4px}
+.lo-tag{font-size:10px;padding:2px 7px;border-radius:8px;background:var(--border);color:var(--muted)}
+.lo-tag.done{background:var(--pass-bg);color:var(--pass)}
+.lo-tag.active{background:var(--info-bg);color:var(--info)}
+.lo-tag.err{background:var(--fail-bg);color:var(--fail)}
+
+/* ── Detail pane ── */
+.detail-inner{padding:24px 28px}
+.detail-top{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.detail-score-badge{width:72px;height:72px;border-radius:50%;border:4px solid var(--gc,#64748b);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.dsb-num{font-size:24px;font-weight:800;color:var(--gc,#64748b);line-height:1}
+.dsb-grade{font-size:11px;font-weight:700;color:var(--gc,#64748b)}
+.detail-name{font-size:19px;font-weight:800}
+.detail-file{font-size:12px;color:var(--muted);font-family:monospace;margin-top:2px}
+.sample-text{font-size:28px;line-height:2;margin-top:12px;padding:16px;background:var(--bg);border-radius:var(--r);border:1px solid var(--border)}
+.sample-small{font-size:16px;line-height:2;margin-top:8px;padding:12px 16px;background:var(--bg);border-radius:var(--r);border:1px solid var(--border)}
+
+/* ── Tabs ── */
+.tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto}
+.tab{padding:8px 14px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:.1s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--text)}
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* ── Sections ── */
+.section{margin-bottom:24px}
+.section-title{font-size:13px;font-weight:700;padding-bottom:7px;border-bottom:2px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.tag{font-size:10px;color:var(--muted);background:var(--border);padding:2px 7px;border-radius:10px;font-weight:600}
+
+/* ── Stat grid ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-bottom:12px}
+.stat-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
+.stat-num{font-size:20px;font-weight:700}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:1px;line-height:1.3}
+
+/* ── Tables ── */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--bg);text-align:left;padding:6px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:2px solid var(--border)}
+td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:hover td{background:var(--bg)}
+code{font-family:monospace;background:var(--bg);border:1px solid var(--border);padding:1px 4px;border-radius:3px;font-size:11px}
+
+/* ── Pills ── */
+.pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;gap:3px}
+.p{background:var(--pass-bg);color:var(--pass)}
+.m{background:var(--fail-bg);color:var(--fail)}
+.w{background:var(--warn-bg);color:var(--warn)}
+.i{background:var(--info-bg);color:var(--info)}
+
+/* ── Issues ── */
+.issue-list{display:flex;flex-direction:column;gap:6px}
+.issue-item{display:flex;gap:10px;padding:10px 14px;border-radius:8px;border:1px solid;font-size:12px;align-items:flex-start}
+.issue-item.error{background:var(--fail-bg);border-color:#fca5a5}
+.issue-item.warning{background:var(--warn-bg);border-color:#fcd34d}
+.issue-item.info{background:var(--info-bg);border-color:#93c5fd}
+.issue-cat{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:2px}
+.issue-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+
+/* ── Feature grid ── */
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px}
+.feat-item{display:flex;gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+.feat-icon{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px}
+.feat-icon.p{background:var(--pass);color:#fff}.feat-icon.m{background:var(--fail);color:#fff}
+.feat-tag{font-family:monospace;font-size:12px;font-weight:700}
+.feat-nm{font-size:11px;font-weight:600;margin-top:1px}
+.feat-desc{font-size:10px;color:var(--muted);margin-top:2px}
+.feat-lk{font-size:10px;color:var(--pass);margin-top:2px}
+
+/* ── Glyph grid ── */
+.glyph-grid{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px}
+.gc{width:52px;height:56px;border:1px solid var(--border);border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;cursor:default}
+.gc.present{background:var(--pass-bg);border-color:#86efac}
+.gc.missing{background:var(--fail-bg);border-color:#fca5a5}
+.gc.revival{border-style:dashed}
+.gc-ch{font-size:22px;line-height:1}
+.gc-cp{font-size:8px;color:var(--muted);margin-top:2px}
+.gc-tt{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;font-size:10px;padding:3px 7px;border-radius:4px;white-space:nowrap;z-index:30;pointer-events:none}
+.gc:hover .gc-tt{display:block}
+.cat-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 5px}
+
+/* ── Score breakdown bars ── */
+.sb-grid{display:flex;flex-direction:column;gap:5px;min-width:180px}
+.sb-row{display:flex;align-items:center;gap:8px}
+.sb-lbl{font-size:11px;color:var(--muted);width:80px;flex-shrink:0}
+.sb-track{flex:1;background:var(--border);border-radius:3px;height:5px;overflow:hidden}
+.sb-fill{height:100%;border-radius:3px}
+.sb-val{font-size:11px;font-weight:700;min-width:28px;text-align:right}
+
+/* ── Responsive ── */
+@media(max-width:700px){
+  .sidebar{width:100%;height:auto;position:static;border-right:none;border-bottom:1px solid var(--border)}
+  .page{flex-direction:column}
+  .detail-pane{height:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="hdr">
+  <div>
+    <div class="hdr-title">🔍 Font Quality Portal · ಫಾಂಟ್ ಗುಣಮಟ್ಟ ತಪಾಸಣೆ</div>
+    <div class="hdr-sub">Sanchaya Kannada Revival Font Inspector — typetest.sanchaya.net</div>
+  </div>
+  <div class="hdr-right">
+    <button class="btn btn-ghost" onclick="reloadAll()">↺ Reload All</button>
+    <button class="btn btn-ghost" onclick="exportAllJSON()">⬇ Export JSON</button>
+    <a class="btn btn-ghost" href="https://fonts.sanchaya.net" target="_blank">fonts.sanchaya.net ↗</a>
+  </div>
+</header>
+
+<!-- ── Summary bar ── -->
+<div class="summary-bar">
+  <div class="summary-stat"><div class="summary-num" id="sum-fonts">—</div><div class="summary-lbl">Fonts</div></div>
+  <div class="summary-stat"><div class="summary-num" id="sum-avg">—</div><div class="summary-lbl">Avg Score</div></div>
+  <div class="summary-stat"><div class="summary-num" id="sum-pass" style="color:var(--pass)">—</div><div class="summary-lbl">Grade A/B</div></div>
+  <div class="summary-stat"><div class="summary-num" id="sum-errors" style="color:var(--fail)">—</div><div class="summary-lbl">Total Errors</div></div>
+  <div class="summary-stat"><div class="summary-num" id="sum-coverage">—</div><div class="summary-lbl">Full Req. Coverage</div></div>
+</div>
+
+<!-- ── Toolbar ── -->
+<div class="toolbar-strip">
+  <span class="toolbar-lbl">Sort by</span>
+  <select id="sort-select" onchange="renderSidebar()">
+    <option value="family">Family (default)</option>
+    <option value="score-desc">Score ↓</option>
+    <option value="score-asc">Score ↑</option>
+    <option value="name">Name A–Z</option>
+    <option value="errors">Most Errors</option>
+  </select>
+</div>
+
+<!-- ── Loading overlay ── -->
+<div id="loading-overlay">
+  <div style="font-size:42px">🔍</div>
+  <div class="lo-title">Analyzing Sanchaya Fonts…</div>
+  <div class="lo-progress"><div class="lo-bar" id="lo-bar" style="width:0%"></div></div>
+  <div class="lo-status" id="lo-status">Connecting to fonts.sanchaya.net…</div>
+  <div class="lo-fonts" id="lo-tags"></div>
+</div>
+
+<!-- ── Main layout ── -->
+<div class="page">
+  <div class="sidebar" id="sidebar">
+    <div style="padding:20px;color:var(--muted);font-size:12px;text-align:center">Loading…</div>
+  </div>
+  <div class="detail-pane" id="detail-pane">
+    <div class="no-select" id="no-select">
+      <div class="no-select-icon">←</div>
+      <div style="font-weight:600">Select a font</div>
+      <div style="font-size:12px;color:var(--muted2)">to view the full quality report</div>
+    </div>
+    <div id="detail-content" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// FONT CATALOG
+// ════════════════════════════════════════════════════════════════════════════
+
+const BASE_URL = 'https://fonts.sanchaya.net/Fonts';
+
+const CATALOG = [
+  {
+    family:'KarnataGTN', displayName:'Karnata GTN',
+    designer:'Arun C Kallappanavar',
+    desc:'Variable Kannada typeface based on G.T. Narayan Rao handwriting. Bridges handwritten expression and formal typography.',
+    source:'https://github.com/sanchaya/karnata-gtn-typeface',
+    fonts:[
+      {name:'KarnataGTN Regular',   file:'KarnataGTN-Regular.ttf',   weight:400},
+      {name:'KarnataGTN Medium',    file:'KarnataGTN-Medium.ttf',    weight:500},
+      {name:'KarnataGTN SemiBold',  file:'KarnataGTN-SemiBold.ttf', weight:600},
+      {name:'KarnataGTN Bold',      file:'KarnataGTN-Bold.ttf',      weight:700},
+      {name:'KarnataGTN ExtraBold', file:'KarnataGTN-ExtraBold.ttf',weight:800},
+      {name:'KarnataGTN Black',     file:'KarnataGTN-Black.ttf',     weight:900},
+      {name:'KarnataGTN Variable',  file:'KarnataGTN-Variable.ttf',  weight:400,variable:true},
+    ]
+  },
+  {
+    family:'Karnata-German-Mission-Press', displayName:'Karnata German Mission Press',
+    designer:'Arun C Kallappanavar',
+    desc:'Digital revival of historical Kannada typeface from German Mission Press prints in Mangaluru.',
+    source:'https://github.com/sanchaya/karnata-german-mission-press-typeface',
+    fonts:[{name:'Karnata German Mission Press',file:'KarnataGermanMissionPressTypeface.ttf',weight:400}]
+  },
+  {
+    family:'Karnata-Wesleyan-Mission-Press', displayName:'Karnata Wesleyan Mission Press',
+    designer:'Arun C Kallappanavar',
+    desc:'Digital revival of historical Kannada typeface from Wesleyan Mission Press prints in Bengaluru and Mangaluru.',
+    source:'https://github.com/sanchaya/karnata-wesleyan-mission-press-typeface',
+    fonts:[{name:'Karnata Wesleyan Mission Press',file:'KarnataWesleyanMissionPress.ttf',weight:400}]
+  },
+  {
+    family:'Karnata-Bandipur', displayName:'Karnata Bandipur',
+    designer:'John Vargas Beltrán / Priya Ravichandran / Arun C Kallappanavar',
+    desc:'Kannada + Latin display typeface with improved OpenType shaping and production-ready font engineering.',
+    source:'https://github.com/sanchaya/karnata-bandipur',
+    fonts:[{name:'Karnata Bandipur',file:'Karnata-Bandipur.ttf',weight:400}]
+  },
+  {
+    family:'Karnata-F-Kittel-Font', displayName:'Karnata F Kittel',
+    designer:'Prashant Pandit, Sachin Shetty, Satish A.G.',
+    desc:'Digital revival of Basel Mission Press Mangalore typeface (1830–1900), named after lexicographer Ferdinand Kittel. Designed for OCR training and Kannada revival research.',
+    source:'https://github.com/sanchaya/karnata-f-kittel-font',
+    fonts:[{name:'Karnata F Kittel',file:'Karnata-F-Kittel.ttf',weight:400}]
+  }
+];
+
+// ════════════════════════════════════════════════════════════════════════════
+// KANNADA UNICODE DATA
+// ════════════════════════════════════════════════════════════════════════════
+
+const KN=[
+  {cp:0x0C80,ch:'ಀ',n:'Spacing Candrabindu',cat:'sign',    req:false,rev:false},
+  {cp:0x0C81,ch:'ಁ',n:'Candrabindu',        cat:'sign',    req:true, rev:false},
+  {cp:0x0C82,ch:'ಂ',n:'Anusvara',           cat:'sign',    req:true, rev:false},
+  {cp:0x0C83,ch:'ಃ',n:'Visarga',            cat:'sign',    req:true, rev:false},
+  {cp:0x0C85,ch:'ಅ',n:'Letter A',           cat:'vowel',   req:true, rev:false},
+  {cp:0x0C86,ch:'ಆ',n:'Letter AA',          cat:'vowel',   req:true, rev:false},
+  {cp:0x0C87,ch:'ಇ',n:'Letter I',           cat:'vowel',   req:true, rev:false},
+  {cp:0x0C88,ch:'ಈ',n:'Letter II',          cat:'vowel',   req:true, rev:false},
+  {cp:0x0C89,ch:'ಉ',n:'Letter U',           cat:'vowel',   req:true, rev:false},
+  {cp:0x0C8A,ch:'ಊ',n:'Letter UU',          cat:'vowel',   req:true, rev:false},
+  {cp:0x0C8B,ch:'ಋ',n:'Letter Vocalic R',   cat:'vowel',   req:true, rev:false},
+  {cp:0x0C8C,ch:'ಌ',n:'Letter Vocalic L',   cat:'vowel',   req:false,rev:true},
+  {cp:0x0C8E,ch:'ಎ',n:'Letter E',           cat:'vowel',   req:true, rev:false},
+  {cp:0x0C8F,ch:'ಏ',n:'Letter EE',          cat:'vowel',   req:true, rev:false},
+  {cp:0x0C90,ch:'ಐ',n:'Letter AI',          cat:'vowel',   req:true, rev:false},
+  {cp:0x0C92,ch:'ಒ',n:'Letter O',           cat:'vowel',   req:true, rev:false},
+  {cp:0x0C93,ch:'ಓ',n:'Letter OO',          cat:'vowel',   req:true, rev:false},
+  {cp:0x0C94,ch:'ಔ',n:'Letter AU',          cat:'vowel',   req:true, rev:false},
+  {cp:0x0C95,ch:'ಕ',n:'Letter KA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0C96,ch:'ಖ',n:'Letter KHA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0C97,ch:'ಗ',n:'Letter GA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0C98,ch:'ಘ',n:'Letter GHA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0C99,ch:'ಙ',n:'Letter NGA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0C9A,ch:'ಚ',n:'Letter CA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0C9B,ch:'ಛ',n:'Letter CHA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0C9C,ch:'ಜ',n:'Letter JA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0C9D,ch:'ಝ',n:'Letter JHA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0C9E,ch:'ಞ',n:'Letter NYA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0C9F,ch:'ಟ',n:'Letter TTA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CA0,ch:'ಠ',n:'Letter TTHA',        cat:'consonant',req:true,rev:false},
+  {cp:0x0CA1,ch:'ಡ',n:'Letter DDA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CA2,ch:'ಢ',n:'Letter DDHA',        cat:'consonant',req:true,rev:false},
+  {cp:0x0CA3,ch:'ಣ',n:'Letter NNA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CA4,ch:'ತ',n:'Letter TA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CA5,ch:'ಥ',n:'Letter THA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CA6,ch:'ದ',n:'Letter DA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CA7,ch:'ಧ',n:'Letter DHA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CA8,ch:'ನ',n:'Letter NA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CAA,ch:'ಪ',n:'Letter PA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CAB,ch:'ಫ',n:'Letter PHA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CAC,ch:'ಬ',n:'Letter BA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CAD,ch:'ಭ',n:'Letter BHA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CAE,ch:'ಮ',n:'Letter MA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CAF,ch:'ಯ',n:'Letter YA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CB0,ch:'ರ',n:'Letter RA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CB1,ch:'ಱ',n:'Letter RRA (Archaic)',cat:'consonant',req:false,rev:true},
+  {cp:0x0CB2,ch:'ಲ',n:'Letter LA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CB3,ch:'ಳ',n:'Letter LLA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CB5,ch:'ವ',n:'Letter VA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CB6,ch:'ಶ',n:'Letter SHA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CB7,ch:'ಷ',n:'Letter SSA',         cat:'consonant',req:true,rev:false},
+  {cp:0x0CB8,ch:'ಸ',n:'Letter SA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CB9,ch:'ಹ',n:'Letter HA',          cat:'consonant',req:true,rev:false},
+  {cp:0x0CBC,ch:'಼',n:'Sign Nukta',         cat:'sign',    req:true, rev:false},
+  {cp:0x0CBD,ch:'ಽ',n:'Sign Avagraha',      cat:'sign',    req:false,rev:false},
+  {cp:0x0CBE,ch:'ಾ',n:'Vowel Sign AA',      cat:'matra',   req:true, rev:false},
+  {cp:0x0CBF,ch:'ಿ',n:'Vowel Sign I',       cat:'matra',   req:true, rev:false},
+  {cp:0x0CC0,ch:'ೀ',n:'Vowel Sign II',      cat:'matra',   req:true, rev:false},
+  {cp:0x0CC1,ch:'ು',n:'Vowel Sign U',       cat:'matra',   req:true, rev:false},
+  {cp:0x0CC2,ch:'ೂ',n:'Vowel Sign UU',      cat:'matra',   req:true, rev:false},
+  {cp:0x0CC3,ch:'ೃ',n:'Vowel Sign Vocalic R',cat:'matra',  req:true, rev:false},
+  {cp:0x0CC4,ch:'ೄ',n:'Vowel Sign Vocalic RR',cat:'matra', req:false,rev:true},
+  {cp:0x0CC6,ch:'ೆ',n:'Vowel Sign E',       cat:'matra',   req:true, rev:false},
+  {cp:0x0CC7,ch:'ೇ',n:'Vowel Sign EE',      cat:'matra',   req:true, rev:false},
+  {cp:0x0CC8,ch:'ೈ',n:'Vowel Sign AI',      cat:'matra',   req:true, rev:false},
+  {cp:0x0CCA,ch:'ೊ',n:'Vowel Sign O',       cat:'matra',   req:true, rev:false},
+  {cp:0x0CCB,ch:'ೋ',n:'Vowel Sign OO',      cat:'matra',   req:true, rev:false},
+  {cp:0x0CCC,ch:'ೌ',n:'Vowel Sign AU',      cat:'matra',   req:true, rev:false},
+  {cp:0x0CCD,ch:'್',n:'Sign Virama (Halant)',cat:'sign',    req:true, rev:false},
+  {cp:0x0CD5,ch:'ೕ',n:'Length Mark',        cat:'sign',    req:false,rev:true},
+  {cp:0x0CD6,ch:'ೖ',n:'AI Length Mark',     cat:'sign',    req:false,rev:true},
+  {cp:0x0CDE,ch:'ೞ',n:'Letter Obsolete LLA',cat:'consonant',req:false,rev:true},
+  {cp:0x0CE0,ch:'ೠ',n:'Letter Vocalic RR',  cat:'vowel',   req:false,rev:true},
+  {cp:0x0CE1,ch:'ೡ',n:'Letter Vocalic LL',  cat:'vowel',   req:false,rev:true},
+  {cp:0x0CE2,ch:'ೢ',n:'Vowel Sign Vocalic L',cat:'matra',  req:false,rev:true},
+  {cp:0x0CE3,ch:'ೣ',n:'Vowel Sign Vocalic LL',cat:'matra', req:false,rev:true},
+  {cp:0x0CE6,ch:'೦',n:'Digit Zero',         cat:'digit',   req:true, rev:false},
+  {cp:0x0CE7,ch:'೧',n:'Digit One',          cat:'digit',   req:true, rev:false},
+  {cp:0x0CE8,ch:'೨',n:'Digit Two',          cat:'digit',   req:true, rev:false},
+  {cp:0x0CE9,ch:'೩',n:'Digit Three',        cat:'digit',   req:true, rev:false},
+  {cp:0x0CEA,ch:'೪',n:'Digit Four',         cat:'digit',   req:true, rev:false},
+  {cp:0x0CEB,ch:'೫',n:'Digit Five',         cat:'digit',   req:true, rev:false},
+  {cp:0x0CEC,ch:'೬',n:'Digit Six',          cat:'digit',   req:true, rev:false},
+  {cp:0x0CED,ch:'೭',n:'Digit Seven',        cat:'digit',   req:true, rev:false},
+  {cp:0x0CEE,ch:'೮',n:'Digit Eight',        cat:'digit',   req:true, rev:false},
+  {cp:0x0CEF,ch:'೯',n:'Digit Nine',         cat:'digit',   req:true, rev:false},
+  {cp:0x0CF1,ch:'ೱ',n:'Sign Jihvamuliya',   cat:'sign',    req:false,rev:true},
+  {cp:0x0CF2,ch:'ೲ',n:'Sign Upadhmaniya',   cat:'sign',    req:false,rev:true},
+];
+
+const OT_FEATURES=[
+  {tag:'nukt',n:'Nukta Forms',        stage:1,req:true, desc:'Nukta + consonant → modified glyph'},
+  {tag:'akhn',n:'Akhand',             stage:1,req:true, desc:'Mandatory ligatures: ಕ್ಷ, ಜ್ಞ'},
+  {tag:'rphf',n:'Reph Form',          stage:1,req:false,desc:'Ra above-base (reph) form'},
+  {tag:'blwf',n:'Below-base Forms',   stage:1,req:true, desc:'Consonants descending below baseline'},
+  {tag:'half',n:'Half Forms',         stage:1,req:false,desc:'Half-consonant forms'},
+  {tag:'pstf',n:'Post-base Forms',    stage:1,req:false,desc:'Consonant forms after base'},
+  {tag:'vatu',n:'Vattu Variants',     stage:1,req:true, desc:'Below-base Ra (vattu) joining forms'},
+  {tag:'cjct',n:'Conjunct Forms',     stage:1,req:true, desc:'Full conjunct ligatures (ottakshara)'},
+  {tag:'pres',n:'Pre-base Subst.',    stage:2,req:true, desc:'Matras appearing before base consonant'},
+  {tag:'abvs',n:'Above-base Subst.',  stage:2,req:true, desc:'Anusvara, chandrabindu above base'},
+  {tag:'blws',n:'Below-base Subst.',  stage:2,req:true, desc:'U, UU, R matras below consonant'},
+  {tag:'psts',n:'Post-base Subst.',   stage:2,req:true, desc:'AA and other post-base matras'},
+  {tag:'haln',n:'Halant Forms',       stage:2,req:true, desc:'Explicit virama (halant) display'},
+  {tag:'locl',n:'Localized Forms',    stage:1,req:false,desc:'Script/language-specific variants'},
+  {tag:'calt',n:'Contextual Alt.',    stage:2,req:false,desc:'Context-sensitive alternate glyphs'},
+  {tag:'dist',n:'Distances',          stage:3,req:false,desc:'Inter-character spacing (Indic)'},
+  {tag:'kern',n:'Kerning',            stage:3,req:false,desc:'Pair-wise kerning adjustments'},
+  {tag:'mark',n:'Mark Positioning',   stage:3,req:true, desc:'Diacritic attachment to base glyphs'},
+  {tag:'mkmk',n:'Mark-to-mark',       stage:3,req:false,desc:'Stacking diacritic positioning'},
+  {tag:'liga',n:'Standard Ligatures', stage:2,req:false,desc:'Optional common ligatures'},
+  {tag:'ss01',n:'Stylistic Set 01',   stage:2,req:false,desc:'First stylistic alternate set'},
+];
+
+const GSUB_T={1:'Single Subst.',2:'Multiple Subst.',3:'Alternate Subst.',4:'Ligature Subst.',5:'Context Subst.',6:'Chained Context',7:'Extension'};
+const GPOS_T={1:'Single Adj.',2:'Pair Adj. (Kern)',3:'Cursive',4:'Mark-to-Base',5:'Mark-to-Lig.',6:'Mark-to-Mark',7:'Context Pos.',8:'Chained Context Pos.',9:'Extension Pos.'};
+const GRADE_C={A:'#16a34a',B:'#2563eb',C:'#d97706',D:'#ea580c',F:'#dc2626'};
+const SAMPLE_LONG = 'ಕನ್ನಡ ಅಕ್ಷರ ಜ್ಞಾನ — ಕ್ಷ ತ್ರ ಪ್ರ ಕ್ರ ಶ್ರ';
+const SAMPLE_BODY = 'ಒಂದು ಕಾಡಿನಲ್ಲಿ ಒಂದು ಸಿಂಹ ವಾಸಿಸುತ್ತಿತ್ತು. ಅದು ಬಹಳ ಬಲಿಷ್ಠ ಮತ್ತು ಶಕ್ತಿಶಾಲಿ ಪ್ರಾಣಿ.';
+
+// ════════════════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════════════════
+
+const state = {
+  reports: {},
+  errors: {},
+  selected: null,
+  fontCSSNames: {},
+};
+
+// Flatten catalog → font list with IDs
+const ALL_FONTS = [];
+CATALOG.forEach(fam => {
+  fam.fonts.forEach(f => {
+    ALL_FONTS.push({
+      id: f.file.replace(/\.ttf$/i,'').replace(/[^a-zA-Z0-9_-]/g,'_'),
+      rawId: f.file.replace(/\.ttf$/i,''),
+      ...f,
+      family: fam.family,
+      familyDisplay: fam.displayName,
+      url: `${BASE_URL}/${fam.family}/${f.file}`,
+    });
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// OPENTYPE.JS HELPERS (uses actual v1.3.4 API)
+// ════════════════════════════════════════════════════════════════════════════
+
+function getScriptRecords(t){
+  const r=t?.scripts||t?.scriptList?.scriptRecords||[];
+  return r.map(x=>({
+    tag:x.tag,
+    defaultLangSys:!!x.script?.defaultLangSys,
+    langSystems:(x.script?.langSysRecords||[]).map(l=>l.tag)
+  }));
+}
+
+function getFeatList(t){
+  const r=t?.features||t?.featureList?.featureRecords||[];
+  return r.map(x=>({
+    tag:x.tag||x.featureTag,
+    lkCount:(x.feature?.lookupListIndexes||x.feature?.lookupListIndices||[]).length,
+    lookups:x.feature?.lookupListIndexes||x.feature?.lookupListIndices||[]
+  }));
+}
+
+function groupByKey(arr,k){
+  return arr.reduce((a,i)=>{(a[i[k]]=a[i[k]]||[]).push(i);return a;},{});
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ANALYSIS ENGINE
+// ════════════════════════════════════════════════════════════════════════════
+
+function analyzeFont(font, fileName){
+  // ── Coverage ──
+  const cov = KN.map(e => {
+    const gi = font.charToGlyphIndex(String.fromCodePoint(e.cp));
+    const has = gi > 0;
+    const cpHex = `U+${e.cp.toString(16).toUpperCase().padStart(4,'0')}`;
+    return {...e, cpHex, has, gi: has ? gi : null};
+  });
+  const req = cov.filter(r=>r.req), rev = cov.filter(r=>r.rev);
+  const coverage = {
+    all: cov,
+    byCategory: groupByKey(cov,'cat'),
+    stats: {
+      total:cov.length, present:cov.filter(r=>r.has).length, missing:cov.filter(r=>!r.has).length,
+      reqTotal:req.length, reqPresent:req.filter(r=>r.has).length, reqMissing:req.filter(r=>!r.has).length,
+      revTotal:rev.length, revPresent:rev.filter(r=>r.has).length
+    },
+    missingReq: cov.filter(r=>r.req&&!r.has),
+    missingRev: cov.filter(r=>r.rev&&!r.has),
+  };
+
+  // ── Metadata ──
+  const n=font.names, os2=font.tables.os2, head=font.tables.head, post=font.tables.post;
+  const getN=k=>{const v=n[k];return v?(v.en||v['en-US']||Object.values(v)[0]||null):null;};
+  const mKeys=['fontFamily','designer','license','version','copyright','fullName','postScriptName','manufacturer'];
+  const fields={};
+  mKeys.forEach(k=>{fields[k]={label:k,value:getN(k),present:!!getN(k)};});
+  const metadata={
+    fields,
+    missing:Object.keys(fields).filter(k=>!fields[k].present),
+    os2: os2?{
+      weightClass:os2.usWeightClass, widthClass:os2.usWidthClass,
+      typoAscender:os2.sTypoAscender, typoDescender:os2.sTypoDescender,
+      capHeight:os2.sCapHeight, xHeight:os2.sxHeight,
+      winAscent:os2.usWinAscent, winDescent:os2.usWinDescent,
+      hasKannada:!!(os2.ulUnicodeRange1&(1<<25))
+    }:null,
+    head: head?{unitsPerEm:head.unitsPerEm}:null,
+    post: post?{italicAngle:post.italicAngle}:null,
+  };
+
+  // ── Scripts ──
+  const gs=font.tables.gsub, gp=font.tables.gpos;
+  const gsRecs=getScriptRecords(gs), gpRecs=getScriptRecords(gp);
+  const scripts={
+    gsub:gsRecs, gpos:gpRecs,
+    hasKnda:gsRecs.some(r=>r.tag==='knda')||gpRecs.some(r=>r.tag==='knda'),
+    hasDFLT:gsRecs.some(r=>r.tag==='DFLT')||gpRecs.some(r=>r.tag==='DFLT'),
+    hasKnd2:gsRecs.some(r=>r.tag==='knd2')||gpRecs.some(r=>r.tag==='knd2'),
+  };
+
+  // ── Features ──
+  const gf=getFeatList(gs), pf=getFeatList(gp);
+  const featAll = OT_FEATURES.map(def=>{
+    const gi=gf.filter(f=>f.tag===def.tag), pi=pf.filter(f=>f.tag===def.tag);
+    return{...def,present:gi.length>0||pi.length>0,
+      lkCount:gi.reduce((s,f)=>s+f.lkCount,0)+pi.reduce((s,f)=>s+f.lkCount,0)};
+  });
+  const features={
+    all:featAll,
+    required:featAll.filter(f=>f.req),
+    optional:featAll.filter(f=>!f.req),
+    stats:{reqTotal:featAll.filter(f=>f.req).length, reqPresent:featAll.filter(f=>f.req&&f.present).length},
+  };
+
+  // ── GSUB ──
+  const gsubLookups = (gs?.lookups||gs?.lookupList?.lookups||[]).map((l,i)=>({
+    index:i, type:l.lookupType, typeName:GSUB_T[l.lookupType]||`Type ${l.lookupType}`,
+    subCount:(l.subtables||[]).length,
+  }));
+  const f2l = getFeatList(gs).reduce((a,f)=>{a[f.tag]=[...(a[f.tag]||[]),...f.lookups];return a;},{});
+  const gsub = gs ? {present:true, lookups:gsubLookups, featRecords:getFeatList(gs), f2l, scriptRecords:gsRecs}
+                  : {present:false};
+
+  // ── GPOS ──
+  let markAnchors=0;
+  (gp?.lookups||gp?.lookupList?.lookups||[]).forEach(l=>{
+    if(l.lookupType===4||l.lookupType===6)
+      (l.subtables||[]).forEach(s=>{markAnchors+=(s.markArray?.markRecords||s.markRecords||[]).length;});
+  });
+  const gpLookups = (gp?.lookups||gp?.lookupList?.lookups||[]).map((l,i)=>({
+    index:i, type:l.lookupType, typeName:GPOS_T[l.lookupType]||`Type ${l.lookupType}`,
+    subCount:(l.subtables||[]).length,
+  }));
+  const gpos = gp ? {
+    present:true, lookups:gpLookups, lookupCount:gpLookups.length, markAnchors,
+    hasKerning:gpLookups.some(l=>l.type===2),
+    hasMarkPos:gpLookups.some(l=>l.type===4),
+    hasMkmk:gpLookups.some(l=>l.type===6),
+    scriptRecords:gpRecs, featRecords:getFeatList(gp),
+  } : {present:false, lookupCount:0, markAnchors:0};
+
+  // ── Glyph inventory ──
+  const glyphs=[];
+  for(let i=0;i<font.glyphs.length;i++){
+    const g=font.glyphs.get(i); if(!g)continue;
+    const unis=g.unicodes||(g.unicode?[g.unicode]:[]);
+    glyphs.push({index:i, name:g.name||`.g${i}`, unicodes:unis.map(u=>`U+${u.toString(16).toUpperCase().padStart(4,'0')}`),
+      aw:g.advanceWidth, isKn:unis.some(u=>u>=0x0C80&&u<=0x0CFF),
+      isEmpty:!g.path||(g.path.commands||[]).length===0});
+  }
+  const knG=glyphs.filter(g=>g.isKn), emptyG=glyphs.filter(g=>g.isEmpty&&g.name!=='.notdef'&&g.unicodes.length>0);
+  const ws=knG.filter(g=>g.aw!=null).map(g=>g.aw).sort((a,b)=>a-b);
+  const median=ws.length?ws[Math.floor(ws.length/2)]:null;
+  const outliers=median?knG.filter(g=>g.aw!=null&&(g.aw>median*2.5||(g.aw<median*0.3&&g.aw>0))):[];
+  const glyphData={total:glyphs.length, kannadaCount:knG.length, emptyCount:emptyG.length, emptyGlyphs:emptyG, outliers, median, unitsPerEm:font.unitsPerEm||1000};
+
+  // ── Issues ──
+  const issues=[];
+  if(metadata.os2&&!metadata.os2.hasKannada) issues.push({sev:'error',cat:'Metadata',msg:'OS/2 Unicode range bit 25 (Kannada) not set'});
+  const missedMeta=['designer','license','version','copyright'].filter(k=>!metadata.fields[k]?.present);
+  if(missedMeta.length) issues.push({sev:'warning',cat:'Metadata',msg:`Missing name fields: ${missedMeta.join(', ')}`});
+  coverage.missingReq.forEach(m=>issues.push({sev:'error',cat:'Coverage',msg:`Missing required: ${m.ch} ${m.cpHex} – ${m.n}`}));
+  if(coverage.missingRev.length) issues.push({sev:'info',cat:'Coverage',msg:`Missing ${coverage.missingRev.length} revival glyph(s): ${coverage.missingRev.map(r=>`${r.ch} ${r.cpHex}`).join(', ')}`});
+  if(!scripts.hasKnda) issues.push({sev:'error',cat:'Script',msg:'No "knda" script record in GSUB/GPOS – shaping will fail on most engines'});
+  features.required.filter(f=>!f.present).forEach(f=>issues.push({sev:'error',cat:'Feature',msg:`Missing required feature "${f.tag}" (${f.n}) – ${f.desc}`}));
+  if(!gpos.present) issues.push({sev:'error',cat:'GPOS',msg:'No GPOS table – mark positioning will not work'});
+  else if(!gpos.hasMarkPos) issues.push({sev:'error',cat:'GPOS',msg:'No Mark-to-Base lookups (type 4) – vowel signs may not attach to consonants'});
+  if(glyphData.emptyCount>0) issues.push({sev:'warning',cat:'Glyphs',msg:`${glyphData.emptyCount} glyph(s) have no path data (empty outlines)`});
+  if(outliers.length>0) issues.push({sev:'warning',cat:'Glyphs',msg:`${outliers.length} Kannada glyph(s) have unusual advance widths (median: ${median}u)`});
+
+  // ── Score ──
+  const reqMeta=['fontFamily','designer','license','version','copyright'];
+  const mPts=Math.round((reqMeta.filter(k=>metadata.fields[k]?.present).length/reqMeta.length)*10);
+  const cPts=Math.round((coverage.stats.reqPresent/Math.max(1,coverage.stats.reqTotal))*40);
+  const fPts=Math.round((features.stats.reqPresent/Math.max(1,features.stats.reqTotal))*30);
+  const sPts=(scripts.hasKnda?8:0)+(gpos.present?2:0);
+  const rPts=coverage.stats.revTotal>0?Math.round((coverage.stats.revPresent/coverage.stats.revTotal)*10):5;
+  const total=Math.min(100,mPts+cPts+fPts+sPts+rPts);
+  const grade=total>=90?'A':total>=75?'B':total>=60?'C':total>=40?'D':'F';
+  const score={total,grade,breakdown:{metadata:mPts,coverage:cPts,features:fPts,scripts:sPts,revival:rPts}};
+
+  return{
+    meta:{tool:'Sanchaya Font Portal',version:'1.0',timestamp:new Date().toISOString(),fontFile:fileName},
+    score,issues,metadata,coverage,scripts,features,gsub,gpos,glyphs:glyphData
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// LOADING
+// ════════════════════════════════════════════════════════════════════════════
+
+async function loadOne(f){
+  state.reports[f.id]='loading';
+  updateLoTag(f.id,'active');
+  try{
+    const resp=await fetch(f.url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf=await resp.arrayBuffer();
+    const font=opentype.parse(buf);
+    // Register CSS font
+    const blob=new Blob([buf],{type:'font/truetype'});
+    const burl=URL.createObjectURL(blob);
+    const cssName=`SF_${f.id}`;
+    state.fontCSSNames[f.id]=cssName;
+    const style=document.createElement('style');
+    style.textContent=`@font-face{font-family:'${cssName}';src:url('${burl}');}`;
+    document.head.appendChild(style);
+    state.reports[f.id]=analyzeFont(font,f.file);
+    updateLoTag(f.id,'done');
+  }catch(e){
+    state.reports[f.id]='error';
+    state.errors[f.id]=e.message;
+    updateLoTag(f.id,'err');
+  }
+}
+
+function updateLoTag(id,cls){
+  const el=document.getElementById(`lo-tag-${id}`);
+  if(el){el.className=`lo-tag ${cls}`;}
+}
+
+async function loadAll(){
+  const total=ALL_FONTS.length;
+  document.getElementById('loading-overlay').style.display='flex';
+  document.getElementById('lo-bar').style.width='0%';
+  document.getElementById('lo-status').textContent='Connecting to fonts.sanchaya.net…';
+  // Build tag pills
+  document.getElementById('lo-tags').innerHTML=ALL_FONTS.map(f=>
+    `<span class="lo-tag" id="lo-tag-${f.id}">${f.name.replace('Karnata ','').split(' ')[0]}</span>`
+  ).join('');
+
+  let done=0;
+  const BATCH=3;
+  for(let i=0;i<ALL_FONTS.length;i+=BATCH){
+    const chunk=ALL_FONTS.slice(i,i+BATCH);
+    await Promise.all(chunk.map(f=>loadOne(f)));
+    done+=chunk.length;
+    const pct=Math.round((done/total)*100);
+    document.getElementById('lo-bar').style.width=pct+'%';
+    document.getElementById('lo-status').textContent=`Analyzed ${done} of ${total} fonts…`;
+    renderSidebar();
+    updateSummary();
+  }
+  document.getElementById('loading-overlay').style.display='none';
+  renderSidebar();
+  updateSummary();
+}
+
+function reloadAll(){
+  state.reports={};state.errors={};state.selected=null;state.fontCSSNames={};
+  document.getElementById('detail-content').style.display='none';
+  document.getElementById('no-select').style.display='flex';
+  loadAll();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SIDEBAR RENDER
+// ════════════════════════════════════════════════════════════════════════════
+
+function scoreOf(f){const r=state.reports[f.id];return(r&&r!=='loading'&&r!=='error')?r.score.total:0;}
+function errorsOf(f){const r=state.reports[f.id];return(r&&r!=='loading'&&r!=='error')?r.issues.filter(i=>i.sev==='error').length:0;}
+
+function sortedFonts(){
+  const sort=document.getElementById('sort-select')?.value||'family';
+  const list=[...ALL_FONTS];
+  if(sort==='score-desc') return list.sort((a,b)=>scoreOf(b)-scoreOf(a));
+  if(sort==='score-asc')  return list.sort((a,b)=>scoreOf(a)-scoreOf(b));
+  if(sort==='name')       return list.sort((a,b)=>a.name.localeCompare(b.name));
+  if(sort==='errors')     return list.sort((a,b)=>errorsOf(b)-errorsOf(a));
+  return list; // family order
+}
+
+function renderSidebar(){
+  const sort=document.getElementById('sort-select')?.value||'family';
+  const byFamily = sort==='family';
+  let html='';
+  if(byFamily){
+    CATALOG.forEach(fam=>{
+      const fFonts=ALL_FONTS.filter(f=>f.family===fam.family);
+      html+=`<div class="family-section">
+        <div class="family-header">${esc(fam.displayName)}</div>`;
+      fFonts.forEach(f=>{ html+=fontItemHTML(f); });
+      html+='</div>';
+    });
+  } else {
+    html='<div class="family-section">';
+    sortedFonts().forEach(f=>{ html+=fontItemHTML(f); });
+    html+='</div>';
+  }
+  document.getElementById('sidebar').innerHTML=html;
+}
+
+function fontItemHTML(f){
+  const r=state.reports[f.id];
+  const isLoading=r==='loading', isError=r==='error', isDone=r&&r!=='loading'&&r!=='error';
+  const active=state.selected===f.id?'active':'';
+  let badge='', sub='';
+  if(isLoading){
+    badge=`<div class="fi-spinner"></div>`;
+    sub='<span>Analyzing…</span>';
+  }else if(isError){
+    badge=`<div class="fi-badge" style="color:var(--fail);border-color:var(--fail);font-size:18px">✗</div>`;
+    sub=`<span style="color:var(--fail);font-size:10px">${esc((state.errors[f.id]||'').slice(0,30))}</span>`;
+  }else if(isDone){
+    const gc=GRADE_C[r.score.grade]||'#64748b';
+    badge=`<div class="fi-badge" style="color:${gc};border-color:${gc}">
+      <div>${r.score.total}</div><div>${r.score.grade}</div>
+    </div>`;
+    const ec=r.issues.filter(i=>i.sev==='error').length;
+    const wc=r.issues.filter(i=>i.sev==='warning').length;
+    sub=`<span class="fi-mini-pill ${ec?'pi-err':'pi-ok'}">${ec} err</span>
+         <span class="fi-mini-pill ${wc?'pi-warn':'pi-ok'}">${wc} warn</span>
+         <span class="fi-mini-pill pi-info">${r.coverage.stats.reqPresent}/${r.coverage.stats.reqTotal}</span>`;
+  }else{
+    badge=`<div class="fi-badge" style="color:var(--muted);border-color:var(--border);font-size:11px">—</div>`;
+    sub='';
+  }
+  return`<div class="font-item ${active}" onclick="selectFont('${f.id}')">
+    ${badge}
+    <div class="fi-info">
+      <div class="fi-name">${esc(f.name)}</div>
+      <div class="fi-sub">${sub}</div>
+    </div>
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SUMMARY BAR
+// ════════════════════════════════════════════════════════════════════════════
+
+function updateSummary(){
+  const done=ALL_FONTS.filter(f=>state.reports[f.id]&&state.reports[f.id]!=='loading'&&state.reports[f.id]!=='error');
+  const reports=done.map(f=>state.reports[f.id]);
+  document.getElementById('sum-fonts').textContent=ALL_FONTS.length;
+  if(reports.length){
+    const avg=Math.round(reports.reduce((s,r)=>s+r.score.total,0)/reports.length);
+    document.getElementById('sum-avg').textContent=`${avg}/100`;
+    document.getElementById('sum-pass').textContent=reports.filter(r=>'AB'.includes(r.score.grade)).length;
+    document.getElementById('sum-errors').textContent=reports.reduce((s,r)=>s+r.issues.filter(i=>i.sev==='error').length,0);
+    document.getElementById('sum-coverage').textContent=reports.filter(r=>r.coverage.stats.reqMissing===0).length;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// DETAIL VIEW
+// ════════════════════════════════════════════════════════════════════════════
+
+function selectFont(id){
+  state.selected=id;
+  renderSidebar();
+  const r=state.reports[id];
+  if(!r||r==='loading'||r==='error'){
+    document.getElementById('no-select').style.display='flex';
+    document.getElementById('detail-content').style.display='none';
+    return;
+  }
+  document.getElementById('no-select').style.display='none';
+  const el=document.getElementById('detail-content');
+  el.style.display='block';
+  el.innerHTML=renderDetail(id,r);
+  showTab(id,'overview');
+}
+
+function showTab(id,tab){
+  document.querySelectorAll(`.tab[data-fid="${id}"]`).forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  document.querySelectorAll(`.tab-panel[data-fid="${id}"]`).forEach(p=>p.classList.toggle('active',p.dataset.tab===tab));
+}
+
+function renderDetail(id,r){
+  const f=ALL_FONTS.find(x=>x.id===id);
+  const fam=CATALOG.find(c=>c.family===f.family);
+  const gc=GRADE_C[r.score.grade]||'#64748b';
+  const css=state.fontCSSNames[id]||'';
+  const fontFamily=`'${css}','Noto Sans Kannada',sans-serif`;
+  const errC=r.issues.filter(i=>i.sev==='error').length;
+  const warnC=r.issues.filter(i=>i.sev==='warning').length;
+  const MAX_PTS={metadata:10,coverage:40,features:30,scripts:10,revival:10};
+
+  return`<div class="detail-inner">
+
+    <!-- Top row -->
+    <div class="detail-top">
+      <div class="detail-score-badge" style="--gc:${gc}">
+        <div class="dsb-num">${r.score.total}</div>
+        <div class="dsb-grade">Grade ${r.score.grade}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="detail-name">${esc(f.name)}</div>
+        <div class="detail-file">${esc(f.file)} · ${esc(fam.displayName)}</div>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+          ${errC?`<span class="pill m">⛔ ${errC} Error${errC>1?'s':''}</span>`:''}
+          ${warnC?`<span class="pill w">⚠ ${warnC} Warning${warnC>1?'s':''}</span>`:''}
+          ${!errC&&!warnC?'<span class="pill p">✓ No critical issues</span>':''}
+        </div>
+      </div>
+      <div class="sb-grid">
+        ${['metadata','coverage','features','scripts','revival'].map(k=>`
+          <div class="sb-row">
+            <span class="sb-lbl">${k.charAt(0).toUpperCase()+k.slice(1)}</span>
+            <div class="sb-track"><div class="sb-fill" style="width:${Math.round(r.score.breakdown[k]/MAX_PTS[k]*100)}%;background:${gc}"></div></div>
+            <span class="sb-val">${r.score.breakdown[k]}<span style="color:var(--muted);font-weight:400">/${MAX_PTS[k]}</span></span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Sample text -->
+    <div class="sample-text" style="font-family:${fontFamily}">${SAMPLE_LONG}</div>
+    <div class="sample-small" style="font-family:${fontFamily}">${SAMPLE_BODY}</div>
+
+    <!-- Tabs -->
+    <div class="tabs" style="margin-top:20px">
+      ${['overview','coverage','features','gsub','gpos','metadata','issues'].map((t,i)=>`
+        <div class="tab${i===0?' active':''}" data-tab="${t}" data-fid="${id}" onclick="showTab('${id}','${t}')">
+          ${t.charAt(0).toUpperCase()+t.slice(1)}${t==='issues'?` (${r.issues.length})`:''}
+        </div>`).join('')}
+    </div>
+
+    <!-- OVERVIEW -->
+    <div class="tab-panel active" data-tab="overview" data-fid="${id}">
+      <div class="section">
+        <div class="section-title">Key Stats</div>
+        <div class="stat-grid">
+          ${statBox(r.glyphs.total,'Total Glyphs')}
+          ${statBox(r.glyphs.kannadaCount,'Kannada Glyphs')}
+          ${statBox(r.coverage.stats.reqPresent+'/'+r.coverage.stats.reqTotal,'Req. Coverage')}
+          ${statBox(r.coverage.stats.revPresent+'/'+r.coverage.stats.revTotal,'Revival Glyphs')}
+          ${statBox(r.features.stats.reqPresent+'/'+r.features.stats.reqTotal,'OT Features (req)')}
+          ${statBox(r.gsub?.lookups?.length||0,'GSUB Lookups')}
+          ${statBox(r.gpos.lookupCount||0,'GPOS Lookups')}
+          ${statBox(r.gpos.markAnchors||0,'Mark Anchors')}
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Script &amp; Shaping Flags</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${pill(r.scripts.hasKnda,'knda script')}
+          ${pill(r.scripts.hasDFLT,'DFLT script')}
+          ${pill(r.scripts.hasKnd2,'knd2 (OpenType 1.6)')}
+          ${pill(r.gpos.present,'GPOS table')}
+          ${pill(r.gpos.hasMarkPos,'Mark-to-Base (T4)')}
+          ${pill(r.gpos.hasMkmk,'Mark-to-Mark (T6)')}
+          ${pill(r.gpos.hasKerning,'Kern (T2)')}
+          ${pill(r.metadata.os2?.hasKannada,'OS/2 Unicode bit 25')}
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Conjunct &amp; Matra Rendering</div>
+        <div style="font-size:32px;line-height:2.2;font-family:${fontFamily};padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px">
+          ಕ್ಷ &#8203; ಜ್ಞ &#8203; ತ್ರ &#8203; ಪ್ರ &#8203; ಕ್ರ &#8203; ಶ್ರ &#8203; ದ್ರ &#8203; ಕ್ತ &#8203; ನ್ಯ &#8203; ದ್ಧ &#8203; ತ್ತ &#8203; ನ್ನ
+        </div>
+        <div style="font-size:20px;line-height:2.5;font-family:${fontFamily};padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-top:8px">
+          ಕ &#8203; ಕಾ &#8203; ಕಿ &#8203; ಕೀ &#8203; ಕು &#8203; ಕೂ &#8203; ಕೆ &#8203; ಕೇ &#8203; ಕೈ &#8203; ಕೊ &#8203; ಕೋ &#8203; ಕೌ &#8203; ಕಂ &#8203; ಕಃ &#8203; ಕ್
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">About</div>
+        <p style="font-size:12px;color:var(--muted)">${esc(fam.desc)}</p>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px">Designer: <strong>${esc(fam.designer)}</strong></p>
+        <p style="font-size:12px;margin-top:4px"><a href="${esc(fam.source)}" target="_blank" style="color:var(--info)">Source repository ↗</a></p>
+      </div>
+    </div>
+
+    <!-- COVERAGE -->
+    <div class="tab-panel" data-tab="coverage" data-fid="${id}">
+      <div class="section">
+        <div class="section-title">
+          Unicode Block U+0C80–U+0CFF
+          <span class="tag">${r.coverage.stats.present}/${r.coverage.stats.total} present</span>
+          <span class="tag">Required: ${r.coverage.stats.reqPresent}/${r.coverage.stats.reqTotal}</span>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:12px;font-size:11px;flex-wrap:wrap">
+          <span><span style="display:inline-block;width:12px;height:12px;background:var(--pass-bg);border:1px solid #86efac;border-radius:2px;vertical-align:middle"></span> Present</span>
+          <span><span style="display:inline-block;width:12px;height:12px;background:var(--fail-bg);border:1px solid #fca5a5;border-radius:2px;vertical-align:middle"></span> Missing</span>
+          <span><span style="display:inline-block;width:12px;height:12px;border:1px dashed var(--muted);border-radius:2px;vertical-align:middle"></span> Revival (★)</span>
+        </div>
+        ${renderGlyphGrid(r.coverage, fontFamily)}
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="tab-panel" data-tab="features" data-fid="${id}">
+      <div class="section">
+        <div class="section-title">Required Features <span class="tag">${r.features.stats.reqPresent}/${r.features.stats.reqTotal} present</span></div>
+        <div class="feat-grid">${r.features.required.map(f=>featItem(f)).join('')}</div>
+      </div>
+      <div class="section" style="margin-top:20px">
+        <div class="section-title">Optional Features</div>
+        <div class="feat-grid">${r.features.optional.map(f=>featItem(f)).join('')}</div>
+      </div>
+    </div>
+
+    <!-- GSUB -->
+    <div class="tab-panel" data-tab="gsub" data-fid="${id}">
+      ${r.gsub?.present?`
+      <div class="section">
+        <div class="section-title">Script Records</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          ${r.gsub.scriptRecords.map(s=>`<span class="pill i"><code>${esc(s.tag)}</code> ${s.defaultLangSys?'dflt':''} ${s.langSystems.length?`+${s.langSystems.length}lang`:''}</span>`).join('')}
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Lookups <span class="tag">${r.gsub.lookups.length}</span></div>
+        <table><thead><tr><th>#</th><th>Type</th><th>Name</th><th>Subtables</th></tr></thead><tbody>
+          ${r.gsub.lookups.slice(0,100).map(l=>`<tr><td>${l.index}</td><td>${l.type}</td><td>${esc(l.typeName)}</td><td>${l.subCount}</td></tr>`).join('')}
+          ${r.gsub.lookups.length>100?`<tr><td colspan="4" style="color:var(--muted);text-align:center">…${r.gsub.lookups.length-100} more</td></tr>`:''}
+        </tbody></table>
+      </div>
+      <div class="section">
+        <div class="section-title">Feature → Lookup Mapping</div>
+        <table><thead><tr><th>Tag</th><th>Lookup Indices</th></tr></thead><tbody>
+          ${Object.entries(r.gsub.f2l||{}).map(([tag,idxs])=>`<tr>
+            <td><code>${esc(tag)}</code></td>
+            <td style="font-family:monospace;font-size:11px;color:var(--muted)">[${idxs.slice(0,30).join(', ')}${idxs.length>30?`…+${idxs.length-30}`:''}]</td>
+          </tr>`).join('')}
+        </tbody></table>
+      </div>`:`<p style="padding:20px;color:var(--fail)">No GSUB table found</p>`}
+    </div>
+
+    <!-- GPOS -->
+    <div class="tab-panel" data-tab="gpos" data-fid="${id}">
+      ${r.gpos?.present?`
+      <div class="section">
+        <div class="section-title">GPOS Summary</div>
+        <div class="stat-grid">
+          ${statBox(r.gpos.lookupCount,'Lookups')}
+          ${statBox(r.gpos.markAnchors,'Mark Anchors')}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          ${pill(r.gpos.hasKerning,'Kerning (type 2)')}
+          ${pill(r.gpos.hasMarkPos,'Mark-to-Base (type 4)')}
+          ${pill(r.gpos.hasMkmk,'Mark-to-Mark (type 6)')}
+        </div>
+      </div>
+      ${r.gpos.lookups.length?`
+      <div class="section">
+        <div class="section-title">Lookups</div>
+        <table><thead><tr><th>#</th><th>Type</th><th>Name</th><th>Subtables</th></tr></thead><tbody>
+          ${r.gpos.lookups.map(l=>`<tr><td>${l.index}</td><td>${l.type}</td><td>${esc(l.typeName)}</td><td>${l.subCount}</td></tr>`).join('')}
+        </tbody></table>
+      </div>`:''}`:`<p style="padding:20px;color:var(--fail)">No GPOS table found – mark positioning unavailable</p>`}
+    </div>
+
+    <!-- METADATA -->
+    <div class="tab-panel" data-tab="metadata" data-fid="${id}">
+      <div class="section">
+        <div class="section-title">Name Table</div>
+        <table><thead><tr><th>Field</th><th>Value</th><th>Status</th></tr></thead><tbody>
+          ${Object.values(r.metadata.fields).map(f=>`<tr>
+            <td>${esc(f.label)}</td>
+            <td style="font-size:12px;max-width:300px;word-break:break-word">${f.value?esc(f.value):'<span style="color:var(--muted2)">—</span>'}</td>
+            <td><span class="pill ${f.present?'p':'w'}">${f.present?'✓ Present':'✗ Missing'}</span></td>
+          </tr>`).join('')}
+        </tbody></table>
+      </div>
+      ${r.metadata.os2?`
+      <div class="section" style="margin-top:16px">
+        <div class="section-title">OS/2 &amp; Head</div>
+        <table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody>
+          ${[
+            ['Units Per Em',r.metadata.head?.unitsPerEm??'—'],
+            ['Weight Class',r.metadata.os2.weightClass],
+            ['Typo Ascender',r.metadata.os2.typoAscender],
+            ['Typo Descender',r.metadata.os2.typoDescender],
+            ['Cap Height',r.metadata.os2.capHeight??'—'],
+            ['x-Height',r.metadata.os2.xHeight??'—'],
+            ['Win Ascent',r.metadata.os2.winAscent],
+            ['Win Descent',r.metadata.os2.winDescent],
+            ['Italic Angle',r.metadata.post?.italicAngle??'—'],
+            ['Kannada Unicode Range bit 25',`<span class="pill ${r.metadata.os2.hasKannada?'p':'m'}">${r.metadata.os2.hasKannada?'✓ Set':'✗ Not set'}</span>`],
+          ].map(([l,v])=>`<tr><td>${l}</td><td>${v}</td></tr>`).join('')}
+        </tbody></table>
+      </div>`:''
+      }
+    </div>
+
+    <!-- ISSUES -->
+    <div class="tab-panel" data-tab="issues" data-fid="${id}">
+      <div class="section">
+        <div class="section-title">Issues &amp; Recommendations</div>
+        ${r.issues.length===0
+          ?`<div class="pill p" style="padding:10px 18px;font-size:13px">✓ No critical issues found</div>`
+          :`<div class="issue-list">
+            ${r.issues.map(i=>`
+              <div class="issue-item ${i.sev}">
+                <span class="issue-icon">${{error:'⛔',warning:'⚠️',info:'ℹ️'}[i.sev]}</span>
+                <div>
+                  <div class="issue-cat">${esc(i.cat)}</div>
+                  <div>${esc(i.msg)}</div>
+                </div>
+              </div>`).join('')}
+          </div>`}
+      </div>
+    </div>
+
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// RENDERING HELPERS
+// ════════════════════════════════════════════════════════════════════════════
+
+function renderGlyphGrid(cov, fontFamily){
+  const cats={
+    vowel:'Independent Vowels',consonant:'Consonants',matra:'Dependent Vowel Signs (Matras)',
+    sign:'Signs & Diacritics',digit:'Digits'
+  };
+  let h='';
+  for(const[cat,label]of Object.entries(cats)){
+    const items=cov.byCategory[cat]||[];
+    if(!items.length)continue;
+    h+=`<div class="cat-lbl">${label} <span class="tag">${items.filter(r=>r.has).length}/${items.length}</span></div>`;
+    h+=`<div class="glyph-grid">`;
+    h+=items.map(r=>`
+      <div class="gc ${r.has?'present':'missing'} ${r.rev?'revival':''}">
+        <div class="gc-ch" style="font-family:${fontFamily}">${r.ch}</div>
+        <div class="gc-cp">${r.cpHex}</div>
+        <div class="gc-tt">${esc(r.n)}${r.rev?' ★':''}</div>
+      </div>`).join('');
+    h+=`</div>`;
+  }
+  return h;
+}
+
+function featItem(f){
+  return`<div class="feat-item">
+    <div class="feat-icon ${f.present?'p':'m'}">${f.present?'✓':'✗'}</div>
+    <div style="min-width:0">
+      <div><span class="feat-tag">${esc(f.tag)}</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:4px">Stage ${f.stage}</span></div>
+      <div class="feat-nm">${esc(f.n)}</div>
+      <div class="feat-desc">${esc(f.desc)}</div>
+      ${f.present?`<div class="feat-lk">↳ ${f.lkCount} lookup${f.lkCount!==1?'s':''}</div>`:''}
+    </div>
+  </div>`;
+}
+
+function statBox(num,label){
+  return`<div class="stat-box"><div class="stat-num">${num??'—'}</div><div class="stat-lbl">${label}</div></div>`;
+}
+
+function pill(ok, label){
+  return`<span class="pill ${ok?'p':'m'}">${ok?'✓':'✗'} ${esc(label)}</span>`;
+}
+
+function esc(s){
+  if(s==null)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EXPORT
+// ════════════════════════════════════════════════════════════════════════════
+
+function exportAllJSON(){
+  const out={
+    generated:new Date().toISOString(),
+    tool:'Sanchaya Font Quality Portal v1.0',
+    fontCount:ALL_FONTS.length,
+    fonts:ALL_FONTS.map(f=>({
+      id:f.rawId, name:f.name, family:f.familyDisplay, url:f.url,
+      report: state.reports[f.id]==='error'?{error:state.errors[f.id]}
+            : state.reports[f.id]==='loading'?{status:'loading'}
+            : state.reports[f.id]||null
+    }))
+  };
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`sanchaya-font-quality-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════════════════════════════════
+
+renderSidebar();
+loadAll();
+</script>
+</body>
+</html>

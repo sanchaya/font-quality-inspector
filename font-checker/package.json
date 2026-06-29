@@ -1,0 +1,22 @@
+{
+  "name": "kannada-font-quality-inspector",
+  "version": "1.0.0",
+  "description": "Quality checker for Kannada revival fonts — checks Unicode coverage, OpenType features, GSUB/GPOS rules, and glyph metrics",
+  "main": "index.js",
+  "bin": {
+    "kannada-font-check": "./index.js"
+  },
+  "scripts": {
+    "check": "node index.js",
+    "test": "echo 'No tests yet' && exit 0"
+  },
+  "keywords": ["kannada", "font", "opentype", "quality", "revival", "unicode", "sanchaya"],
+  "author": "Sanchaya / Sanchi Foundation",
+  "license": "MIT",
+  "dependencies": {
+    "opentype.js": "^1.3.4"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

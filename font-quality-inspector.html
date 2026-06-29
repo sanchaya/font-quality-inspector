@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Font Quality Inspector — ಫಾಂಟ್ ಗುಣಮಟ್ಟ ತಪಾಸಣೆ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
+<style>
+:root {
+  --bg:#fff; --surface:#f8fafc; --border:#e2e8f0;
+  --text:#0f172a; --muted:#64748b;
+  --pass:#16a34a; --fail:#dc2626; --warn:#d97706; --info:#2563eb;
+  --pass-bg:#dcfce7; --fail-bg:#fee2e2; --warn-bg:#fef9c3; --info-bg:#dbeafe;
+  --r:8px; --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --header-bg:#0f172a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh}
+
+/* ── Header ── */
+.hdr{background:var(--header-bg);color:#fff;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:100}
+.hdr-left{display:flex;align-items:center;gap:14px}
+.hdr-logo{height:28px}
+.hdr-title{font-size:15px;font-weight:700;letter-spacing:.01em}
+.hdr-sub{font-size:11px;color:#94a3b8;margin-top:1px}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.btn{padding:6px 14px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn-ghost{background:rgba(255,255,255,.1);color:#fff}.btn-ghost:hover{background:rgba(255,255,255,.18)}
+.btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{opacity:.88}
+
+/* ── Drop Zone ── */
+#drop-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 57px);padding:40px 24px;text-align:center}
+.drop-inner{border:2px dashed var(--border);border-radius:16px;padding:60px 80px;background:var(--surface);transition:border-color .15s,background .15s;cursor:pointer;max-width:540px;width:100%}
+.drop-inner:hover,.drop-inner.drag-over{border-color:#3b82f6;background:#eff6ff}
+.drop-icon{font-size:52px;margin-bottom:16px}
+.drop-title{font-size:20px;font-weight:700;margin-bottom:8px}
+.drop-sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+.drop-formats{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.fmt-tag{background:var(--border);color:var(--muted);padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.drop-history{margin-top:20px;display:none}
+.drop-history h4{font-size:13px;color:var(--muted);margin-bottom:8px}
+
+/* ── Main Layout ── */
+#main{display:none;padding:20px 28px}
+.top-bar{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.font-name{font-size:20px;font-weight:800}
+.font-file{font-size:12px;color:var(--muted);font-family:monospace}
+.score-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:68px;height:68px;border-radius:50%;border:4px solid var(--grade-color,#64748b);flex-shrink:0}
+.score-num{font-size:22px;font-weight:800;color:var(--grade-color,#64748b);line-height:1}
+.score-grade{font-size:11px;font-weight:700;color:var(--grade-color,#64748b)}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab{padding:8px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s}
+.tab.active{color:var(--text);border-bottom-color:var(--text)}
+.tab .tab-count{font-size:10px;background:var(--fail-bg);color:var(--fail);padding:1px 5px;border-radius:8px;margin-left:4px}
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* ── Sections ── */
+.section{margin-bottom:32px}
+.section-title{font-size:15px;font-weight:700;padding-bottom:8px;border-bottom:2px solid var(--border);margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:500;color:var(--muted);background:var(--border);padding:2px 8px;border-radius:10px}
+
+/* ── Stats Grid ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-bottom:16px}
+.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;text-align:center}
+.stat-num{font-size:24px;font-weight:700}
+.stat-label{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.3}
+
+/* ── Tables ── */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--surface);text-align:left;padding:7px 10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:2px solid var(--border)}
+td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:hover td{background:var(--surface)}
+code{font-family:monospace;background:var(--surface);border:1px solid var(--border);padding:1px 5px;border-radius:4px;font-size:12px}
+
+/* ── Pills & Badges ── */
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.pill-pass{background:var(--pass-bg);color:var(--pass)}
+.pill-fail{background:var(--fail-bg);color:var(--fail)}
+.pill-warn{background:var(--warn-bg);color:var(--warn)}
+.pill-info{background:var(--info-bg);color:var(--info)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600}
+.badge-error{background:var(--fail-bg);color:var(--fail)}
+.badge-warn{background:var(--warn-bg);color:var(--warn)}
+.badge-ok{background:var(--pass-bg);color:var(--pass)}
+
+/* ── Issues ── */
+.issue-list{display:flex;flex-direction:column;gap:8px}
+.issue-item{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:var(--r);border:1px solid var(--border)}
+.issue-item.error{background:var(--fail-bg);border-color:#fca5a5}
+.issue-item.warning{background:var(--warn-bg);border-color:#fcd34d}
+.issue-item.info{background:var(--info-bg);border-color:#93c5fd}
+.issue-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.issue-cat{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.issue-msg{font-size:13px;margin-top:2px}
+
+/* ── Glyph Grid ── */
+.glyph-grid{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px}
+.gc{width:56px;height:60px;border:1px solid var(--border);border-radius:6px;
+   display:flex;flex-direction:column;align-items:center;justify-content:center;
+   position:relative;cursor:default}
+.gc.p{background:var(--pass-bg);border-color:#86efac}
+.gc.m{background:var(--fail-bg);border-color:#fca5a5}
+.gc.revival{border-style:dashed}
+.gc-ch{font-size:22px;line-height:1}
+.gc-cp{font-size:9px;color:var(--muted)}
+.gc-tt{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);
+  background:#1e293b;color:#fff;font-size:11px;padding:4px 8px;border-radius:4px;white-space:nowrap;z-index:20;pointer-events:none}
+.gc:hover .gc-tt{display:block}
+.cat-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px}
+
+/* ── Feature Grid ── */
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.feat-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+.feat-icon{width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-top:2px}
+.feat-icon.p{background:var(--pass);color:#fff}
+.feat-icon.m{background:var(--fail);color:#fff}
+.feat-tag{font-family:monospace;font-size:13px;font-weight:700}
+.feat-name{font-size:12px;font-weight:600}
+.feat-desc{font-size:11px;color:var(--muted);margin-top:2px}
+.feat-lk{font-size:11px;color:var(--pass)}
+
+/* ── Score breakdown bar ── */
+.score-breakdown{display:flex;flex-direction:column;gap:5px;min-width:200px}
+.sb-row{display:flex;align-items:center;gap:8px}
+.sb-label{font-size:11px;color:var(--muted);width:110px;flex-shrink:0}
+.sb-bar-wrap{flex:1;background:var(--border);border-radius:4px;height:5px;overflow:hidden}
+.sb-bar{height:100%;border-radius:4px;background:#3b82f6;transition:width .4s}
+.sb-val{font-size:11px;font-weight:600;min-width:36px;text-align:right}
+
+/* ── Diff section ── */
+.diff-section{background:#f0fdf4;border:1px solid #86efac;border-radius:var(--r);padding:16px 20px;margin-bottom:20px}
+.diff-title{font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.delta.pos{color:var(--pass);font-weight:700}
+.delta.neg{color:var(--fail);font-weight:700}
+.delta.neu{color:var(--muted);font-weight:700}
+
+/* ── History panel ── */
+.history-list{display:flex;flex-direction:column;gap:8px}
+.history-item{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);cursor:pointer}
+.history-item:hover{border-color:#3b82f6}
+.history-score{font-size:18px;font-weight:700}
+.history-meta{flex:1}
+.history-name{font-weight:600;font-size:13px}
+.history-ts{font-size:11px;color:var(--muted)}
+.history-actions{display:flex;gap:6px}
+
+/* ── Loading ── */
+#loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);
+  align-items:center;justify-content:center;z-index:200;flex-direction:column;gap:12px}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Progress bar for score ── */
+.progress-ring{position:relative;width:68px;height:68px}
+
+/* ── Responsive ── */
+@media(max-width:600px){
+  .hdr{padding:10px 16px}
+  #main{padding:16px}
+  .drop-inner{padding:40px 24px}
+  .score-breakdown{display:none}
+  th,td{padding:5px 7px}
+  .feat-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────── -->
+<header class="hdr">
+  <div class="hdr-left">
+    <img class="hdr-logo" src="https://typetest.sanchaya.net/img/app-icon-light.png"
+         alt="Sanchaya" onerror="this.style.display='none'">
+    <div>
+      <div class="hdr-title">Font Quality Inspector · ಫಾಂಟ್ ಗುಣಮಟ್ಟ ತಪಾಸಣೆ</div>
+      <div class="hdr-sub">Kannada Revival Font Checker — Sanchaya Font Tools</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <button class="btn btn-ghost" id="btn-export-json" style="display:none" onclick="exportJSON()">⬇ Export JSON</button>
+    <button class="btn btn-ghost" id="btn-compare"     style="display:none" onclick="triggerCompare()">↔ Compare</button>
+    <button class="btn btn-ghost" id="btn-reset"       style="display:none" onclick="resetTool()">✕ Reset</button>
+    <a class="btn btn-ghost" href="https://fonts.sanchaya.net" target="_blank">fonts.sanchaya.net ↗</a>
+  </div>
+</header>
+
+<!-- ── Drop Zone ────────────────────────────────────────────────────── -->
+<div id="drop-zone">
+  <div class="drop-inner" id="drop-target" onclick="document.getElementById('file-input').click()">
+    <div class="drop-icon">🔍</div>
+    <div class="drop-title">Drop a Kannada font to inspect</div>
+    <div class="drop-sub">Drag &amp; drop a font file here, or click to browse</div>
+    <div class="drop-formats">
+      <span class="fmt-tag">TTF</span>
+      <span class="fmt-tag">OTF</span>
+      <span class="fmt-tag">WOFF</span>
+    </div>
+  </div>
+
+  <!-- Report history -->
+  <div class="drop-history" id="history-panel">
+    <h4>Previous Reports</h4>
+    <div class="history-list" id="history-list"></div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept=".ttf,.otf,.woff,.woff2" style="display:none">
+<input type="file" id="compare-input" accept=".json" style="display:none">
+
+<!-- ── Loading overlay ──────────────────────────────────────────────── -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div>Analyzing font…</div>
+</div>
+
+<!-- ── Main Report ──────────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <div class="score-badge" id="score-badge">
+      <div class="score-num" id="score-num">—</div>
+      <div class="score-grade" id="score-grade">—</div>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div class="font-name" id="font-name">—</div>
+      <div class="font-file" id="font-file">—</div>
+      <div id="issue-summary" style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+    <div class="score-breakdown" id="score-breakdown"></div>
+  </div>
+
+  <!-- Diff banner -->
+  <div id="diff-section" class="diff-section" style="display:none"></div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="overview">Overview</div>
+    <div class="tab" data-tab="coverage">Unicode Coverage</div>
+    <div class="tab" data-tab="features">OpenType Features</div>
+    <div class="tab" data-tab="gsub">GSUB Rules</div>
+    <div class="tab" data-tab="gpos">GPOS Rules</div>
+    <div class="tab" data-tab="glyphs">Glyph Inventory</div>
+    <div class="tab" data-tab="metadata">Metadata</div>
+    <div class="tab" data-tab="issues">Issues <span class="tab-count" id="issue-count">0</span></div>
+  </div>
+
+  <!-- ─ OVERVIEW ── -->
+  <div class="tab-panel active" id="panel-overview">
+    <div class="section">
+      <div class="section-title">Quick Stats</div>
+      <div class="stat-grid" id="overview-stats"></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Script &amp; Language Tables</div>
+      <div id="overview-scripts"></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Key Conjuncts</div>
+      <div id="overview-conjuncts" style="font-size:28px;line-height:2;letter-spacing:.05em"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">Rendered in the loaded font — visual confirmation of conjunct shaping</div>
+    </div>
+    <div class="section">
+      <div class="section-title">Sample Text (Vowels &amp; Consonants)</div>
+      <div id="overview-sample" style="font-size:32px;line-height:2;letter-spacing:.03em"></div>
+    </div>
+  </div>
+
+  <!-- ─ COVERAGE ── -->
+  <div class="tab-panel" id="panel-coverage">
+    <div class="section">
+      <div class="section-title">Kannada Unicode Block (U+0C80–U+0CFF) <span class="tag" id="coverage-tag">—</span></div>
+      <div class="stat-grid" id="coverage-stats"></div>
+      <div style="display:flex;gap:12px;margin-bottom:12px;font-size:12px;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:14px;background:var(--pass-bg);border:1px solid #86efac;display:inline-block;border-radius:3px"></span> Present</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:14px;background:var(--fail-bg);border:1px solid #fca5a5;display:inline-block;border-radius:3px"></span> Missing</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:14px;border:1px dashed var(--border);display:inline-block;border-radius:3px"></span> Revival/Archaic</span>
+      </div>
+      <div id="coverage-grid"></div>
+    </div>
+  </div>
+
+  <!-- ─ FEATURES ── -->
+  <div class="tab-panel" id="panel-features">
+    <div class="section">
+      <div class="section-title">Required OpenType Features <span class="tag" id="feat-required-tag">—</span></div>
+      <div class="feat-grid" id="feat-required"></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Recommended / Optional Features</div>
+      <div class="feat-grid" id="feat-optional"></div>
+    </div>
+  </div>
+
+  <!-- ─ GSUB ── -->
+  <div class="tab-panel" id="panel-gsub">
+    <div class="section">
+      <div class="section-title">GSUB — Substitution Rules <span class="tag" id="gsub-tag">—</span></div>
+      <div class="stat-grid" id="gsub-stats"></div>
+      <div id="gsub-scripts" style="margin-bottom:16px"></div>
+      <table id="gsub-table">
+        <thead><tr><th>#</th><th>Type</th><th>Subtables</th><th>Rules</th></tr></thead>
+        <tbody id="gsub-tbody"></tbody>
+      </table>
+      <div style="margin-top:20px">
+        <div class="section-title" style="font-size:13px">Feature → Lookup Mapping</div>
+        <table><thead><tr><th>Feature</th><th>Lookup Indices</th></tr></thead>
+        <tbody id="gsub-feat-tbody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ GPOS ── -->
+  <div class="tab-panel" id="panel-gpos">
+    <div class="section">
+      <div class="section-title">GPOS — Positioning Rules <span class="tag" id="gpos-tag">—</span></div>
+      <div class="stat-grid" id="gpos-stats"></div>
+      <div id="gpos-capabilities" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
+      <table id="gpos-table">
+        <thead><tr><th>#</th><th>Type</th><th>Subtables</th></tr></thead>
+        <tbody id="gpos-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─ GLYPHS ── -->
+  <div class="tab-panel" id="panel-glyphs">
+    <div class="section">
+      <div class="section-title">Glyph Inventory <span class="tag" id="glyph-tag">—</span></div>
+      <div class="stat-grid" id="glyph-stats"></div>
+      <div id="empty-glyphs-section"></div>
+      <div id="outlier-section"></div>
+      <div style="margin-top:16px">
+        <input type="text" id="glyph-search" placeholder="Filter by name or Unicode…"
+          style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:12px">
+        <table>
+          <thead><tr><th>Index</th><th>Name</th><th>Unicode</th><th>Advance Width</th><th>Kannada</th></tr></thead>
+          <tbody id="glyph-tbody"></tbody>
+        </table>
+        <div id="glyph-pagination" style="margin-top:8px;color:var(--muted);font-size:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ METADATA ── -->
+  <div class="tab-panel" id="panel-metadata">
+    <div class="section">
+      <div class="section-title">Name Table Records</div>
+      <table><thead><tr><th>Field</th><th>Value</th><th>Status</th></tr></thead>
+      <tbody id="meta-tbody"></tbody></table>
+    </div>
+    <div class="section" id="os2-section" style="margin-top:20px">
+      <div class="section-title">OS/2 &amp; Head Table</div>
+      <table><thead><tr><th>Property</th><th>Value</th></tr></thead>
+      <tbody id="os2-tbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ─ ISSUES ── -->
+  <div class="tab-panel" id="panel-issues">
+    <div class="section">
+      <div class="section-title">Issues &amp; Recommendations</div>
+      <div id="issue-list-wrap"></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// KANNADA DATA
+// ════════════════════════════════════════════════════════════════════════════
+
+const KN = [
+  {cp:0x0C80,ch:'ಀ',n:'Spacing Candrabindu',  cat:'sign',     req:false,rev:false},
+  {cp:0x0C81,ch:'ಁ',n:'Candrabindu',          cat:'sign',     req:true, rev:false},
+  {cp:0x0C82,ch:'ಂ',n:'Anusvara',             cat:'sign',     req:true, rev:false},
+  {cp:0x0C83,ch:'ಃ',n:'Visarga',              cat:'sign',     req:true, rev:false},
+  {cp:0x0C85,ch:'ಅ',n:'Letter A',             cat:'vowel',    req:true, rev:false},
+  {cp:0x0C86,ch:'ಆ',n:'Letter AA',            cat:'vowel',    req:true, rev:false},
+  {cp:0x0C87,ch:'ಇ',n:'Letter I',             cat:'vowel',    req:true, rev:false},
+  {cp:0x0C88,ch:'ಈ',n:'Letter II',            cat:'vowel',    req:true, rev:false},
+  {cp:0x0C89,ch:'ಉ',n:'Letter U',             cat:'vowel',    req:true, rev:false},
+  {cp:0x0C8A,ch:'ಊ',n:'Letter UU',            cat:'vowel',    req:true, rev:false},
+  {cp:0x0C8B,ch:'ಋ',n:'Letter Vocalic R',     cat:'vowel',    req:true, rev:false},
+  {cp:0x0C8C,ch:'ಌ',n:'Letter Vocalic L',     cat:'vowel',    req:false,rev:true },
+  {cp:0x0C8E,ch:'ಎ',n:'Letter E',             cat:'vowel',    req:true, rev:false},
+  {cp:0x0C8F,ch:'ಏ',n:'Letter EE',            cat:'vowel',    req:true, rev:false},
+  {cp:0x0C90,ch:'ಐ',n:'Letter AI',            cat:'vowel',    req:true, rev:false},
+  {cp:0x0C92,ch:'ಒ',n:'Letter O',             cat:'vowel',    req:true, rev:false},
+  {cp:0x0C93,ch:'ಓ',n:'Letter OO',            cat:'vowel',    req:true, rev:false},
+  {cp:0x0C94,ch:'ಔ',n:'Letter AU',            cat:'vowel',    req:true, rev:false},
+  {cp:0x0C95,ch:'ಕ',n:'Letter KA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0C96,ch:'ಖ',n:'Letter KHA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0C97,ch:'ಗ',n:'Letter GA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0C98,ch:'ಘ',n:'Letter GHA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0C99,ch:'ಙ',n:'Letter NGA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0C9A,ch:'ಚ',n:'Letter CA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0C9B,ch:'ಛ',n:'Letter CHA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0C9C,ch:'ಜ',n:'Letter JA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0C9D,ch:'ಝ',n:'Letter JHA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0C9E,ch:'ಞ',n:'Letter NYA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0C9F,ch:'ಟ',n:'Letter TTA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CA0,ch:'ಠ',n:'Letter TTHA',          cat:'consonant',req:true, rev:false},
+  {cp:0x0CA1,ch:'ಡ',n:'Letter DDA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CA2,ch:'ಢ',n:'Letter DDHA',          cat:'consonant',req:true, rev:false},
+  {cp:0x0CA3,ch:'ಣ',n:'Letter NNA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CA4,ch:'ತ',n:'Letter TA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CA5,ch:'ಥ',n:'Letter THA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CA6,ch:'ದ',n:'Letter DA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CA7,ch:'ಧ',n:'Letter DHA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CA8,ch:'ನ',n:'Letter NA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CAA,ch:'ಪ',n:'Letter PA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CAB,ch:'ಫ',n:'Letter PHA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CAC,ch:'ಬ',n:'Letter BA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CAD,ch:'ಭ',n:'Letter BHA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CAE,ch:'ಮ',n:'Letter MA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CAF,ch:'ಯ',n:'Letter YA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CB0,ch:'ರ',n:'Letter RA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CB1,ch:'ಱ',n:'Letter RRA (Archaic)', cat:'consonant',req:false,rev:true },
+  {cp:0x0CB2,ch:'ಲ',n:'Letter LA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CB3,ch:'ಳ',n:'Letter LLA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CB5,ch:'ವ',n:'Letter VA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CB6,ch:'ಶ',n:'Letter SHA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CB7,ch:'ಷ',n:'Letter SSA',           cat:'consonant',req:true, rev:false},
+  {cp:0x0CB8,ch:'ಸ',n:'Letter SA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CB9,ch:'ಹ',n:'Letter HA',            cat:'consonant',req:true, rev:false},
+  {cp:0x0CBC,ch:'಼',n:'Sign Nukta',           cat:'sign',     req:true, rev:false},
+  {cp:0x0CBD,ch:'ಽ',n:'Sign Avagraha',        cat:'sign',     req:false,rev:false},
+  {cp:0x0CBE,ch:'ಾ',n:'Vowel Sign AA',        cat:'matra',    req:true, rev:false},
+  {cp:0x0CBF,ch:'ಿ',n:'Vowel Sign I',         cat:'matra',    req:true, rev:false},
+  {cp:0x0CC0,ch:'ೀ',n:'Vowel Sign II',        cat:'matra',    req:true, rev:false},
+  {cp:0x0CC1,ch:'ು',n:'Vowel Sign U',         cat:'matra',    req:true, rev:false},
+  {cp:0x0CC2,ch:'ೂ',n:'Vowel Sign UU',        cat:'matra',    req:true, rev:false},
+  {cp:0x0CC3,ch:'ೃ',n:'Vowel Sign Vocalic R', cat:'matra',    req:true, rev:false},
+  {cp:0x0CC4,ch:'ೄ',n:'Vowel Sign Vocalic RR',cat:'matra',    req:false,rev:true },
+  {cp:0x0CC6,ch:'ೆ',n:'Vowel Sign E',         cat:'matra',    req:true, rev:false},
+  {cp:0x0CC7,ch:'ೇ',n:'Vowel Sign EE',        cat:'matra',    req:true, rev:false},
+  {cp:0x0CC8,ch:'ೈ',n:'Vowel Sign AI',        cat:'matra',    req:true, rev:false},
+  {cp:0x0CCA,ch:'ೊ',n:'Vowel Sign O',         cat:'matra',    req:true, rev:false},
+  {cp:0x0CCB,ch:'ೋ',n:'Vowel Sign OO',        cat:'matra',    req:true, rev:false},
+  {cp:0x0CCC,ch:'ೌ',n:'Vowel Sign AU',        cat:'matra',    req:true, rev:false},
+  {cp:0x0CCD,ch:'್',n:'Sign Virama (Halant)',  cat:'sign',     req:true, rev:false},
+  {cp:0x0CD5,ch:'ೕ',n:'Length Mark',          cat:'sign',     req:false,rev:true },
+  {cp:0x0CD6,ch:'ೖ',n:'AI Length Mark',       cat:'sign',     req:false,rev:true },
+  {cp:0x0CDE,ch:'ೞ',n:'Letter Obsolete LLA',  cat:'consonant',req:false,rev:true },
+  {cp:0x0CE0,ch:'ೠ',n:'Letter Vocalic RR',    cat:'vowel',    req:false,rev:true },
+  {cp:0x0CE1,ch:'ೡ',n:'Letter Vocalic LL',    cat:'vowel',    req:false,rev:true },
+  {cp:0x0CE2,ch:'ೢ',n:'Vowel Sign Vocalic L', cat:'matra',    req:false,rev:true },
+  {cp:0x0CE3,ch:'ೣ',n:'Vowel Sign Vocalic LL',cat:'matra',    req:false,rev:true },
+  {cp:0x0CE6,ch:'೦',n:'Digit Zero',           cat:'digit',    req:true, rev:false},
+  {cp:0x0CE7,ch:'೧',n:'Digit One',            cat:'digit',    req:true, rev:false},
+  {cp:0x0CE8,ch:'೨',n:'Digit Two',            cat:'digit',    req:true, rev:false},
+  {cp:0x0CE9,ch:'೩',n:'Digit Three',          cat:'digit',    req:true, rev:false},
+  {cp:0x0CEA,ch:'೪',n:'Digit Four',           cat:'digit',    req:true, rev:false},
+  {cp:0x0CEB,ch:'೫',n:'Digit Five',           cat:'digit',    req:true, rev:false},
+  {cp:0x0CEC,ch:'೬',n:'Digit Six',            cat:'digit',    req:true, rev:false},
+  {cp:0x0CED,ch:'೭',n:'Digit Seven',          cat:'digit',    req:true, rev:false},
+  {cp:0x0CEE,ch:'೮',n:'Digit Eight',          cat:'digit',    req:true, rev:false},
+  {cp:0x0CEF,ch:'೯',n:'Digit Nine',           cat:'digit',    req:true, rev:false},
+  {cp:0x0CF1,ch:'ೱ',n:'Sign Jihvamuliya',     cat:'sign',     req:false,rev:true },
+  {cp:0x0CF2,ch:'ೲ',n:'Sign Upadhmaniya',     cat:'sign',     req:false,rev:true },
+];
+
+const OT_FEATURES=[
+  {tag:'nukt',n:'Nukta Forms',       stage:1,req:true, desc:'Nukta + consonant → modified glyph'},
+  {tag:'akhn',n:'Akhand',           stage:1,req:true, desc:'Mandatory ligatures: ಕ್ಷ (ksha), ಜ್ಞ (jnya)'},
+  {tag:'rphf',n:'Reph Form',        stage:1,req:false,desc:'Ra above-base (reph) form'},
+  {tag:'blwf',n:'Below-base Forms', stage:1,req:true, desc:'Consonants that descend below baseline'},
+  {tag:'half',n:'Half Forms',       stage:1,req:false,desc:'Half-consonant forms'},
+  {tag:'pstf',n:'Post-base Forms',  stage:1,req:false,desc:'Consonant forms after base'},
+  {tag:'vatu',n:'Vattu Variants',   stage:1,req:true, desc:'Below-base Ra (vattu) joining forms'},
+  {tag:'cjct',n:'Conjunct Forms',   stage:1,req:true, desc:'Full conjunct ligatures (ottakshara)'},
+  {tag:'pres',n:'Pre-base Subst.',  stage:2,req:true, desc:'Matras appearing before base consonant'},
+  {tag:'abvs',n:'Above-base Subst.',stage:2,req:true, desc:'Anusvara, chandrabindu above base'},
+  {tag:'blws',n:'Below-base Subst.',stage:2,req:true, desc:'U, UU, R matras below consonant'},
+  {tag:'psts',n:'Post-base Subst.', stage:2,req:true, desc:'AA and other post-base matras'},
+  {tag:'haln',n:'Halant Forms',     stage:2,req:true, desc:'Explicit virama (halant) display'},
+  {tag:'locl',n:'Localized Forms',  stage:1,req:false,desc:'Script/language-specific glyph variants'},
+  {tag:'calt',n:'Contextual Alt.',  stage:2,req:false,desc:'Context-sensitive alternate glyphs'},
+  {tag:'dist',n:'Distances',        stage:3,req:false,desc:'Inter-character spacing (Indic preferred)'},
+  {tag:'kern',n:'Kerning',          stage:3,req:false,desc:'Pair-wise kerning adjustments'},
+  {tag:'mark',n:'Mark Positioning', stage:3,req:true, desc:'Diacritic attachment to base glyphs'},
+  {tag:'mkmk',n:'Mark-to-mark',     stage:3,req:false,desc:'Stacking diacritic positioning'},
+  {tag:'liga',n:'Standard Ligatures',stage:2,req:false,desc:'Optional common ligatures'},
+  {tag:'ss01',n:'Stylistic Set 01', stage:2,req:false,desc:'First stylistic alternate set'},
+  {tag:'ss02',n:'Stylistic Set 02', stage:2,req:false,desc:'Second stylistic alternate set'},
+];
+
+const GSUB_TYPES={1:'Single (1→1)',2:'Multiple (1→many)',3:'Alternate',4:'Ligature (many→1)',5:'Context',6:'Chained Context',7:'Extension',8:'Reverse Chain'};
+const GPOS_TYPES={1:'Single Adjustment',2:'Pair Adjustment (Kerning)',3:'Cursive Attachment',4:'Mark-to-Base',5:'Mark-to-Ligature',6:'Mark-to-Mark',7:'Context Positioning',8:'Chained Context Pos.',9:'Extension Positioning'};
+
+const CONJUNCTS=[
+  {seq:'ಕ್ಷ',label:'ksha'},  {seq:'ಜ್ಞ',label:'jnya'},
+  {seq:'ಶ್ರ',label:'shra'},  {seq:'ತ್ರ',label:'tra'},
+  {seq:'ಪ್ರ',label:'pra'},   {seq:'ಕ್ರ',label:'kra'},
+  {seq:'ದ್ರ',label:'dra'},   {seq:'ಕ್ತ',label:'kta'},
+  {seq:'ಸ್ತ',label:'sta'},   {seq:'ನ್ಯ',label:'nya'},
+  {seq:'ದ್ಧ',label:'ddha'},  {seq:'ತ್ತ',label:'tta'},
+];
+
+// ════════════════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════════════════
+
+let currentReport  = null;
+let currentFont    = null;
+let allGlyphs      = [];
+let glyphPage      = 0;
+const PAGE_SIZE    = 100;
+const GRADE_COLORS = {A:'#16a34a',B:'#2563eb',C:'#d97706',D:'#ea580c',F:'#dc2626'};
+
+// ════════════════════════════════════════════════════════════════════════════
+// FONT LOADING
+// ════════════════════════════════════════════════════════════════════════════
+
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) loadFontFile(e.target.files[0]);
+});
+document.getElementById('compare-input').addEventListener('change', e => {
+  if (!e.target.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const old = JSON.parse(ev.target.result);
+      const diff = compareReports(old, currentReport);
+      renderDiff(diff);
+    } catch(err) { alert('Could not parse JSON report: ' + err.message); }
+  };
+  reader.readAsText(e.target.files[0]);
+});
+
+const dropTarget = document.getElementById('drop-target');
+dropTarget.addEventListener('dragover', e => { e.preventDefault(); dropTarget.classList.add('drag-over'); });
+dropTarget.addEventListener('dragleave', () => dropTarget.classList.remove('drag-over'));
+dropTarget.addEventListener('drop', e => {
+  e.preventDefault();
+  dropTarget.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) loadFontFile(f);
+});
+
+function loadFontFile(file) {
+  document.getElementById('loading').style.display = 'flex';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const buf  = ev.target.result;
+      const font = opentype.parse(buf);
+      currentFont = font;
+
+      // Register as CSS font
+      const blob = new Blob([buf], { type: 'font/truetype' });
+      const url  = URL.createObjectURL(blob);
+      const style = document.getElementById('loaded-font-style') || document.createElement('style');
+      style.id = 'loaded-font-style';
+      style.textContent = `@font-face { font-family: 'LoadedFont'; src: url('${url}'); }`;
+      document.head.appendChild(style);
+
+      const report = buildReport(font, file.name);
+      currentReport = report;
+      saveToHistory(report, file.name);
+      renderReport(report);
+    } catch(err) {
+      alert('Error parsing font: ' + err.message);
+    } finally {
+      document.getElementById('loading').style.display = 'none';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ANALYSIS
+// ════════════════════════════════════════════════════════════════════════════
+
+function buildReport(font, fileName) {
+  const metadata  = analyzeMetadata(font);
+  const coverage  = analyzeCoverage(font);
+  const scripts   = analyzeScripts(font);
+  const features  = analyzeFeatures(font);
+  const gsub      = analyzeGSUB(font);
+  const gpos      = analyzeGPOS(font);
+  const glyphs    = analyzeGlyphs(font);
+  const issues    = generateIssues({metadata,coverage,scripts,features,gsub,gpos,glyphs});
+  const score     = calcScore({metadata,coverage,features,scripts,gpos});
+
+  return {
+    meta: { tool:'Kannada Font Quality Inspector', version:'1.0.0', timestamp:new Date().toISOString(), fontFile:fileName },
+    score, issues, metadata, coverage, scripts, features, gsub, gpos, glyphs
+  };
+}
+
+function analyzeMetadata(font) {
+  const n = font.names;
+  const fields = {};
+  const KEY_FIELDS = ['fontFamily','designer','license','version','copyright','fullName','postScriptName','manufacturer'];
+  for (const k of KEY_FIELDS) {
+    const v = n[k];
+    const text = v ? (v.en || v['en-US'] || Object.values(v)[0] || null) : null;
+    fields[k] = { label: k, value: text, present: !!text };
+  }
+  const os2 = font.tables.os2;
+  const head = font.tables.head;
+  const r1 = os2?.ulUnicodeRange1 || 0;
+  const hasKannada = !!(r1 & (1<<25));
+  return {
+    fields,
+    os2: os2 ? {
+      weightClass: os2.usWeightClass,
+      widthClass:  os2.usWidthClass,
+      typoAscender: os2.sTypoAscender,
+      typoDescender: os2.sTypoDescender,
+      capHeight: os2.sCapHeight,
+      xHeight: os2.sxHeight,
+      winAscent: os2.usWinAscent,
+      winDescent: os2.usWinDescent,
+      hasKannada,
+    } : null,
+    head: head ? { unitsPerEm: head.unitsPerEm } : null,
+    post: font.tables.post ? { italicAngle: font.tables.post.italicAngle } : null,
+  };
+}
+
+function analyzeCoverage(font) {
+  const results = KN.map(e => {
+    const gi = font.charToGlyphIndex(String.fromCodePoint(e.cp));
+    const has = gi > 0;
+    let aw = null;
+    if (has) { const g = font.glyphs.get(gi); aw = g ? g.advanceWidth : null; }
+    return { ...e, cpHex:`U+${e.cp.toString(16).toUpperCase().padStart(4,'0')}`, has, gi: has?gi:null, aw };
+  });
+  const req = results.filter(r=>r.req), rev = results.filter(r=>r.rev);
+  return {
+    all: results,
+    byCategory: groupBy(results,'cat'),
+    stats: {
+      total: results.length,
+      present: results.filter(r=>r.has).length,
+      missing: results.filter(r=>!r.has).length,
+      reqTotal: req.length,
+      reqPresent: req.filter(r=>r.has).length,
+      reqMissing: req.filter(r=>!r.has).length,
+      revTotal: rev.length,
+      revPresent: rev.filter(r=>r.has).length,
+    },
+    missingReq: results.filter(r=>r.req&&!r.has),
+    missingRev: results.filter(r=>r.rev&&!r.has),
+  };
+}
+
+function analyzeScripts(font) {
+  const gsub = font.tables.gsub, gpos = font.tables.gpos;
+  const gsr = getScriptRecords(gsub), psr = getScriptRecords(gpos);
+  return {
+    gsub: gsr, gpos: psr,
+    hasKnda: gsr.some(r=>r.tag==='knda') || psr.some(r=>r.tag==='knda'),
+    hasDFLT: gsr.some(r=>r.tag==='DFLT') || psr.some(r=>r.tag==='DFLT'),
+  };
+}
+
+function getScriptRecords(t) {
+  // opentype.js uses t.scripts (flat array) not t.scriptList.scriptRecords
+  const records = t?.scripts || t?.scriptList?.scriptRecords || [];
+  return records.map(r=>({
+    tag: r.tag,
+    defaultLangSys: !!r.script?.defaultLangSys,
+    langSystems: (r.script?.langSysRecords||[]).map(l=>l.tag),
+  }));
+}
+
+function analyzeFeatures(font) {
+  const gf = getFeatList(font.tables.gsub);
+  const pf = getFeatList(font.tables.gpos);
+  const all = OT_FEATURES.map(def => {
+    const gi = gf.filter(f=>f.tag===def.tag);
+    const pi = pf.filter(f=>f.tag===def.tag);
+    const present = gi.length>0 || pi.length>0;
+    const lkCount = gi.reduce((s,f)=>s+f.lkCount,0) + pi.reduce((s,f)=>s+f.lkCount,0);
+    return {...def, present, lkCount};
+  });
+  return {
+    all,
+    required:    all.filter(f=>f.req),
+    optional:    all.filter(f=>!f.req),
+    stats: {
+      reqTotal:   all.filter(f=>f.req).length,
+      reqPresent: all.filter(f=>f.req&&f.present).length,
+    },
+  };
+}
+
+function getFeatList(t) {
+  // opentype.js uses t.features (flat array); property is lookupListIndexes not Indices
+  const records = t?.features || t?.featureList?.featureRecords || [];
+  return records.map(r=>({
+    tag: r.tag || r.featureTag,
+    lkCount: (r.feature?.lookupListIndexes || r.feature?.lookupListIndices || []).length,
+    lookups: r.feature?.lookupListIndexes || r.feature?.lookupListIndices || [],
+  }));
+}
+
+function analyzeGSUB(font) {
+  const gsub = font.tables.gsub;
+  if (!gsub) return { present:false };
+  const lookups = (gsub.lookups||gsub.lookupList?.lookups||[]).map((l,i)=>({
+    index:i, type:l.lookupType,
+    typeName: GSUB_TYPES[l.lookupType]||`Type ${l.lookupType}`,
+    subCount: (l.subtables||[]).length,
+    ruleCount: countRules(l),
+  }));
+  const typeBD = {};
+  lookups.forEach(l=>{ typeBD[l.typeName]=(typeBD[l.typeName]||0)+1; });
+  const f2l = {};
+  getFeatList(gsub).forEach(f=>{
+    if(!f2l[f.tag]) f2l[f.tag]=[];
+    f.lookups.forEach(i=>{ if(!f2l[f.tag].includes(i)) f2l[f.tag].push(i); });
+  });
+  return {
+    present:true, lookupCount:lookups.length, lookups, typeBD, f2l,
+    totalRules: lookups.reduce((s,l)=>s+l.ruleCount,0),
+    scriptRecords: getScriptRecords(gsub),
+    featRecords: getFeatList(gsub),
+  };
+}
+
+function countRules(lk) {
+  let c=0;
+  for(const s of (lk.subtables||[])) {
+    if(s.ligatureSets) { for(const ls of s.ligatureSets) c+=(ls.ligatures||ls).length||0; }
+    else if(s.glyphs)  { c+=s.glyphs.length; }
+    else if(s.coverage){ c+=(s.coverage.glyphs||[]).length||1; }
+    else c++;
+  }
+  return c || (lk.subtables||[]).length;
+}
+
+function analyzeGPOS(font) {
+  const gpos = font.tables.gpos;
+  if (!gpos) return { present:false };
+  const lookups = (gpos.lookups||gpos.lookupList?.lookups||[]).map((l,i)=>({
+    index:i, type:l.lookupType,
+    typeName: GPOS_TYPES[l.lookupType]||`Type ${l.lookupType}`,
+    subCount: (l.subtables||[]).length,
+  }));
+  const typeBD={};
+  lookups.forEach(l=>{ typeBD[l.typeName]=(typeBD[l.typeName]||0)+1; });
+  let markAnchors=0;
+  (gpos.lookups||gpos.lookupList?.lookups||[]).forEach(l=>{
+    if(l.lookupType===4||l.lookupType===6) {
+      (l.subtables||[]).forEach(s=>{ if(s.markArray) markAnchors+=(s.markArray.markRecords||[]).length; });
+    }
+  });
+  return {
+    present:true, lookupCount:lookups.length, lookups, typeBD, markAnchors,
+    hasKerning: lookups.some(l=>l.type===2),
+    hasMarkPos: lookups.some(l=>l.type===4),
+    hasMkmk:    lookups.some(l=>l.type===6),
+    scriptRecords: getScriptRecords(gpos),
+    featRecords: getFeatList(gpos),
+  };
+}
+
+function analyzeGlyphs(font) {
+  const list=[];
+  for(let i=0;i<font.glyphs.length;i++){
+    const g=font.glyphs.get(i);
+    if(!g) continue;
+    const unis = g.unicodes||(g.unicode?[g.unicode]:[]);
+    list.push({
+      index:i, name:g.name||`.glyph${i}`,
+      unicodes: unis.map(u=>`U+${u.toString(16).toUpperCase().padStart(4,'0')}`),
+      aw: g.advanceWidth,
+      isKannada: unis.some(u=>u>=0x0C80&&u<=0x0CFF),
+      isEmpty: !g.path||(g.path.commands||[]).length===0,
+    });
+  }
+  const kn=list.filter(g=>g.isKannada);
+  const empty=list.filter(g=>g.isEmpty&&g.name!=='.notdef'&&g.unicodes.length>0);
+  const widths=kn.filter(g=>g.aw!=null).map(g=>g.aw).sort((a,b)=>a-b);
+  const median=widths.length?widths[Math.floor(widths.length/2)]:null;
+  const outliers=median?kn.filter(g=>g.aw!=null&&(g.aw>median*2.5||(g.aw<median*0.3&&g.aw>0))):[];
+  return {
+    total:list.length, kannadaCount:kn.length, emptyCount:empty.length,
+    emptyGlyphs:empty, outliers, median, glyphs:list,
+    unitsPerEm: font.unitsPerEm||1000,
+  };
+}
+
+function generateIssues(r) {
+  const iss=[];
+  const {metadata,coverage,scripts,features,gsub,gpos,glyphs}=r;
+
+  if(metadata.os2&&!metadata.os2.hasKannada)
+    iss.push({sev:'error',cat:'Metadata',msg:'OS/2 Unicode range bit 25 (Kannada) is not set'});
+
+  const missingMeta=['designer','license','version','copyright'].filter(k=>!metadata.fields[k]?.present);
+  if(missingMeta.length)
+    iss.push({sev:'warning',cat:'Metadata',msg:`Missing metadata: ${missingMeta.join(', ')}`});
+
+  coverage.missingReq.forEach(m=>iss.push({sev:'error',cat:'Coverage',msg:`Missing required glyph: ${m.ch} ${m.cpHex} – ${m.n}`}));
+
+  if(coverage.missingRev.length)
+    iss.push({sev:'info',cat:'Coverage',msg:`Missing ${coverage.missingRev.length} revival/archaic glyph(s): `+coverage.missingRev.map(r=>`${r.ch} (${r.cpHex})`).join(', ')});
+
+  if(!scripts.hasKnda)
+    iss.push({sev:'error',cat:'Script Tables',msg:'No "knda" script record found in GSUB or GPOS tables'});
+
+  features.required.filter(f=>!f.present).forEach(f=>
+    iss.push({sev:'error',cat:'OpenType Features',msg:`Missing required feature "${f.tag}" (${f.n}): ${f.desc}`}));
+
+  if(!gpos.present) iss.push({sev:'error',cat:'GPOS',msg:'No GPOS table – mark positioning will not work'});
+  else if(!gpos.hasMarkPos) iss.push({sev:'error',cat:'GPOS',msg:'No Mark-to-Base positioning (type 4) – vowel signs may not attach correctly'});
+
+  if(glyphs.emptyCount>0)
+    iss.push({sev:'warning',cat:'Glyphs',msg:`${glyphs.emptyCount} glyph(s) have Unicode mappings but no path data`});
+
+  if(glyphs.outliers.length>0)
+    iss.push({sev:'warning',cat:'Glyphs',msg:`${glyphs.outliers.length} Kannada glyph(s) have unusual advance widths vs. median (${glyphs.median} units)`});
+
+  return iss;
+}
+
+function calcScore(r) {
+  const {metadata,coverage,features,scripts,gpos}=r;
+  const keyMeta=['fontFamily','designer','license','version','copyright'];
+  const mPts = Math.round((keyMeta.filter(k=>metadata.fields[k]?.present).length/keyMeta.length)*10);
+  const cPts = Math.round((coverage.stats.reqPresent/coverage.stats.reqTotal)*40);
+  const fPts = Math.round((features.stats.reqPresent/features.stats.reqTotal)*30);
+  const sPts = (scripts.hasKnda?8:0)+(gpos.present?2:0);
+  const rPts = coverage.stats.revTotal>0
+    ? Math.round((coverage.stats.revPresent/coverage.stats.revTotal)*10) : 5;
+  const total = Math.min(100, mPts+cPts+fPts+sPts+rPts);
+  const grade = total>=90?'A':total>=75?'B':total>=60?'C':total>=40?'D':'F';
+  return { total, grade, breakdown:{metadata:mPts,coverage:cPts,features:fPts,scripts:sPts,revival:rPts} };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// DIFF / COMPARE
+// ════════════════════════════════════════════════════════════════════════════
+
+function compareReports(oldR, newR) {
+  const oldP = new Set(oldR.coverage.all.filter(r=>r.has||r.hasGlyph).map(r=>r.cpHex));
+  const newP = new Set(newR.coverage.all.filter(r=>r.has||r.hasGlyph).map(r=>r.cpHex));
+  const oldF = new Set(oldR.features?.all?.filter(f=>f.present).map(f=>f.tag)||[]);
+  const newF = new Set(newR.features?.all?.filter(f=>f.present).map(f=>f.tag)||[]);
+  const oldI = new Set((oldR.issues||[]).map(i=>i.message||i.msg));
+  const newI = new Set((newR.issues||[]).map(i=>i.message||i.msg));
+  return {
+    old: { file:oldR.meta.fontFile, ts:oldR.meta.timestamp, score:oldR.score.total },
+    new: { file:newR.meta.fontFile, ts:newR.meta.timestamp, score:newR.score.total },
+    delta: newR.score.total - oldR.score.total,
+    glyphsAdded:   newR.coverage.all.filter(r=>(r.has||r.hasGlyph)&&!oldP.has(r.cpHex)),
+    glyphsRemoved: oldR.coverage.all.filter(r=>(r.has||r.hasGlyph)&&!newP.has(r.cpHex)),
+    featAdded:   [...newF].filter(t=>!oldF.has(t)),
+    featRemoved: [...oldF].filter(t=>!newF.has(t)),
+    issuesResolved:   (oldR.issues||[]).filter(i=>!newI.has(i.message||i.msg)),
+    issuesIntroduced: (newR.issues||[]).filter(i=>!oldI.has(i.message||i.msg)),
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// RENDERING
+// ════════════════════════════════════════════════════════════════════════════
+
+function renderReport(report) {
+  document.getElementById('drop-zone').style.display = 'none';
+  document.getElementById('main').style.display      = 'block';
+  ['btn-export-json','btn-compare','btn-reset'].forEach(id=>document.getElementById(id).style.display='');
+
+  const {score,issues,metadata,coverage,scripts,features,gsub,gpos,glyphs,meta} = report;
+  const gc = GRADE_COLORS[score.grade]||'#64748b';
+
+  // Score badge
+  const sb = document.getElementById('score-badge');
+  sb.style.setProperty('--grade-color', gc);
+  document.getElementById('score-num').textContent  = score.total;
+  document.getElementById('score-grade').textContent = 'Grade '+score.grade;
+
+  // Font name
+  const fn = metadata.fields.fullName?.value || metadata.fields.fontFamily?.value || meta.fontFile;
+  document.getElementById('font-name').textContent = fn;
+  document.getElementById('font-file').textContent = meta.fontFile;
+
+  // Apply loaded font to sample areas
+  ['#overview-conjuncts','#overview-sample','#panel-coverage .gc-ch'].forEach(sel=>{
+    document.querySelectorAll(sel).forEach(el=>el.style.fontFamily="'LoadedFont', 'Noto Sans Kannada', sans-serif");
+  });
+
+  // Issue summary
+  const errC=issues.filter(i=>i.sev==='error').length, warnC=issues.filter(i=>i.sev==='warning').length;
+  const isumEl = document.getElementById('issue-summary');
+  isumEl.innerHTML = '';
+  if(errC)  isumEl.innerHTML += `<span class="badge badge-error">⛔ ${errC} Error${errC>1?'s':''}</span>`;
+  if(warnC) isumEl.innerHTML += `<span class="badge badge-warn">⚠️ ${warnC} Warning${warnC>1?'s':''}</span>`;
+  if(!errC&&!warnC) isumEl.innerHTML += '<span class="badge badge-ok">✓ No critical issues</span>';
+  document.getElementById('issue-count').textContent = issues.length;
+
+  // Score breakdown
+  const bd = document.getElementById('score-breakdown');
+  bd.innerHTML = ['metadata','coverage','features','scripts','revival']
+    .map(k=>sbRow(k.charAt(0).toUpperCase()+k.slice(1), score.breakdown[k], {metadata:10,coverage:40,features:30,scripts:10,revival:10}[k], gc))
+    .join('');
+
+  renderOverview(report);
+  renderCoverage(coverage);
+  renderFeatures(features);
+  renderGSUB(gsub);
+  renderGPOS(gpos);
+  renderGlyphs(glyphs);
+  renderMetadata(metadata);
+  renderIssues(issues);
+
+  // Apply font to rendered Kannada
+  setTimeout(()=>{
+    document.querySelectorAll('.gc-ch, #overview-conjuncts, #overview-sample').forEach(el=>{
+      el.style.fontFamily="'LoadedFont','Noto Sans Kannada',sans-serif";
+    });
+  }, 100);
+}
+
+function sbRow(label, val, max, color) {
+  const pct = Math.round((val/max)*100);
+  return `<div class="sb-row">
+    <span class="sb-label">${label}</span>
+    <div class="sb-bar-wrap"><div class="sb-bar" style="width:${pct}%;background:${color}"></div></div>
+    <span class="sb-val">${val}/${max}</span>
+  </div>`;
+}
+
+function renderOverview(report) {
+  const {score,coverage,features,gsub,gpos,glyphs,scripts,metadata} = report;
+
+  // Stats
+  document.getElementById('overview-stats').innerHTML = [
+    statBox(glyphs.total, 'Total Glyphs'),
+    statBox(glyphs.kannadaCount, 'Kannada Glyphs'),
+    statBox(coverage.stats.present, 'Unicode Present'),
+    statBox(coverage.stats.reqMissing, 'Required Missing'),
+    statBox(features.stats.reqPresent+'/'+features.stats.reqTotal, 'OT Features'),
+    statBox(gpos.markAnchors||0, 'Mark Anchors'),
+    statBox(gsub.lookupCount||0, 'GSUB Lookups'),
+    statBox(gpos.lookupCount||0, 'GPOS Lookups'),
+  ].join('');
+
+  // Scripts
+  const kndaOk = scripts.hasKnda, dfltOk = scripts.hasDFLT;
+  const markOk = gpos.hasMarkPos;
+  document.getElementById('overview-scripts').innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="pill ${kndaOk?'pill-pass':'pill-fail'}">${kndaOk?'✓':'✗'} knda Script Record</span>
+      <span class="pill ${dfltOk?'pill-pass':'pill-warn'}">${dfltOk?'✓':'!'} DFLT Script Record</span>
+      <span class="pill ${gpos.present?'pill-pass':'pill-fail'}">${gpos.present?'✓':'✗'} GPOS Table</span>
+      <span class="pill ${markOk?'pill-pass':'pill-fail'}">${markOk?'✓':'✗'} Mark-to-Base</span>
+      <span class="pill ${gpos.hasMkmk?'pill-pass':'pill-warn'}">${gpos.hasMkmk?'✓':'!'} Mark-to-Mark</span>
+      <span class="pill ${metadata.os2?.hasKannada?'pill-pass':'pill-fail'}">${metadata.os2?.hasKannada?'✓':'✗'} OS/2 Kannada bit</span>
+    </div>`;
+
+  // Conjuncts
+  const conj = document.getElementById('overview-conjuncts');
+  conj.innerHTML = CONJUNCTS.map(c=>
+    `<span title="${c.label}" style="margin-right:20px;font-family:'LoadedFont','Noto Sans Kannada',sans-serif">${c.seq}</span>`
+  ).join('');
+
+  // Sample
+  const sample = document.getElementById('overview-sample');
+  sample.style.fontFamily = "'LoadedFont','Noto Sans Kannada',sans-serif";
+  sample.textContent = 'ಅ ಆ ಇ ಈ ಉ ಊ ಋ ಎ ಏ ಐ ಒ ಓ ಔ — ಕ ಖ ಗ ಘ ಙ ಚ ಛ ಜ ಝ ಞ ಟ ಠ ಡ ಢ ಣ ತ ಥ ದ ಧ ನ ಪ ಫ ಬ ಭ ಮ ಯ ರ ಲ ಳ ವ ಶ ಷ ಸ ಹ';
+}
+
+function renderCoverage(coverage) {
+  const {stats, byCategory, missingReq, missingRev} = coverage;
+  document.getElementById('coverage-tag').textContent = `${stats.present}/${stats.total} · Required: ${stats.reqPresent}/${stats.reqTotal}`;
+  document.getElementById('coverage-stats').innerHTML = [
+    statBox(stats.present, 'Present'),
+    statBox(stats.missing, 'Missing'),
+    statBox(stats.reqPresent, 'Req. Present'),
+    statBox(stats.reqMissing, 'Req. Missing'),
+    statBox(stats.revPresent, 'Revival Present'),
+    statBox(stats.revTotal-stats.revPresent, 'Revival Missing'),
+  ].join('');
+
+  const cats = {vowel:'Independent Vowels',consonant:'Consonants',matra:'Dependent Vowel Signs',sign:'Signs & Diacritics',digit:'Digits'};
+  let html = '';
+  for(const [cat,label] of Object.entries(cats)){
+    const items = byCategory[cat]||[];
+    if(!items.length) continue;
+    html += `<div class="cat-label">${label}</div><div class="glyph-grid">`;
+    html += items.map(r=>`
+      <div class="gc ${r.has?'p':'m'} ${r.rev?'revival':''}">
+        <div class="gc-ch" style="font-family:'LoadedFont','Noto Sans Kannada',sans-serif">${r.ch}</div>
+        <div class="gc-cp">${r.cpHex}</div>
+        <div class="gc-tt">${esc(r.n)}${r.rev?' (revival)':''}</div>
+      </div>`).join('');
+    html += '</div>';
+  }
+  document.getElementById('coverage-grid').innerHTML = html;
+}
+
+function renderFeatures(features) {
+  document.getElementById('feat-required-tag').textContent = `${features.stats.reqPresent}/${features.stats.reqTotal} present`;
+  document.getElementById('feat-required').innerHTML = features.required.map(featItem).join('');
+  document.getElementById('feat-optional').innerHTML = features.optional.map(featItem).join('');
+}
+
+function featItem(f) {
+  return `<div class="feat-item">
+    <div class="feat-icon ${f.present?'p':'m'}">${f.present?'✓':'✗'}</div>
+    <div>
+      <div><span class="feat-tag">${esc(f.tag)}</span></div>
+      <div class="feat-name">${esc(f.n)}</div>
+      <div class="feat-desc">${esc(f.desc)}</div>
+      ${f.present?`<div class="feat-lk">↳ ${f.lkCount} lookup(s)</div>`:''}
+    </div>
+  </div>`;
+}
+
+function renderGSUB(gsub) {
+  if (!gsub.present) {
+    document.getElementById('gsub-tag').textContent = 'No GSUB table';
+    document.getElementById('gsub-tbody').innerHTML = '<tr><td colspan="4" style="color:var(--fail)">No GSUB table found</td></tr>';
+    return;
+  }
+  document.getElementById('gsub-tag').textContent = `${gsub.lookupCount} lookups · ${gsub.totalRules} rules`;
+  document.getElementById('gsub-stats').innerHTML = [
+    statBox(gsub.lookupCount,'Lookups'),
+    statBox(gsub.totalRules,'Total Rules'),
+    statBox(Object.keys(gsub.typeBD||{}).length,'Lookup Types'),
+    statBox((gsub.featRecords||[]).length,'Feature Records'),
+  ].join('');
+  document.getElementById('gsub-scripts').innerHTML = renderScriptPills(gsub.scriptRecords||[]);
+  document.getElementById('gsub-tbody').innerHTML = (gsub.lookups||[]).slice(0,100).map(l=>
+    `<tr><td>${l.index}</td><td>${esc(l.typeName)}</td><td>${l.subCount}</td><td>${l.ruleCount}</td></tr>`
+  ).join('') + ((gsub.lookups||[]).length>100?`<tr><td colspan="4" style="color:var(--muted);text-align:center">…and ${gsub.lookups.length-100} more</td></tr>`:'');
+  document.getElementById('gsub-feat-tbody').innerHTML = Object.entries(gsub.f2l||{}).map(([tag,idxs])=>
+    `<tr><td><code>${esc(tag)}</code></td><td style="font-family:monospace;font-size:12px">${idxs.slice(0,20).join(', ')}${idxs.length>20?'…':''}</td></tr>`
+  ).join('');
+}
+
+function renderGPOS(gpos) {
+  if (!gpos.present) {
+    document.getElementById('gpos-tag').textContent = 'No GPOS table';
+    document.getElementById('gpos-tbody').innerHTML = '<tr><td colspan="3" style="color:var(--fail)">No GPOS table found</td></tr>';
+    return;
+  }
+  document.getElementById('gpos-tag').textContent = `${gpos.lookupCount} lookups · ${gpos.markAnchors} mark anchors`;
+  document.getElementById('gpos-stats').innerHTML = [
+    statBox(gpos.lookupCount,'Lookups'),
+    statBox(gpos.markAnchors,'Mark Anchors'),
+    statBox(Object.keys(gpos.typeBD||{}).length,'Lookup Types'),
+    statBox((gpos.featRecords||[]).length,'Feature Records'),
+  ].join('');
+  const caps=[
+    ['Kerning (type 2)',gpos.hasKerning],
+    ['Mark-to-Base (type 4)',gpos.hasMarkPos],
+    ['Mark-to-Mark (type 6)',gpos.hasMkmk],
+  ];
+  document.getElementById('gpos-capabilities').innerHTML = caps.map(([l,v])=>
+    `<span class="pill ${v?'pill-pass':v===false?'pill-fail':'pill-warn'}">${v?'✓':'✗'} ${l}</span>`
+  ).join('');
+  document.getElementById('gpos-tbody').innerHTML = (gpos.lookups||[]).map(l=>
+    `<tr><td>${l.index}</td><td>${esc(l.typeName)}</td><td>${l.subCount}</td></tr>`
+  ).join('');
+}
+
+function renderScriptPills(records) {
+  if(!records.length) return '';
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">`+
+    records.map(r=>`<span class="pill pill-info"><code>${esc(r.tag)}</code>${r.defaultLangSys?' ✓':''} ${r.langSystems.join(' ')}</span>`).join('')+
+    '</div>';
+}
+
+function renderGlyphs(glyphs) {
+  document.getElementById('glyph-tag').textContent = `${glyphs.total} total · ${glyphs.kannadaCount} Kannada`;
+  document.getElementById('glyph-stats').innerHTML = [
+    statBox(glyphs.total,'Total Glyphs'),
+    statBox(glyphs.kannadaCount,'Kannada Glyphs'),
+    statBox(glyphs.emptyCount,'Empty Glyphs'),
+    statBox(glyphs.unitsPerEm,'Units Per Em'),
+    statBox(glyphs.median||'—','Median Adv. Width'),
+    statBox(glyphs.outliers.length,'Width Outliers'),
+  ].join('');
+
+  if(glyphs.emptyCount>0){
+    document.getElementById('empty-glyphs-section').innerHTML = `
+      <div class="cat-label" style="margin-bottom:6px">Empty Glyphs (no path data)</div>
+      <table><thead><tr><th>Index</th><th>Name</th><th>Unicode</th></tr></thead><tbody>
+        ${glyphs.emptyGlyphs.slice(0,20).map(g=>`<tr><td>${g.index}</td><td><code>${esc(g.name)}</code></td><td>${g.unicodes.join(', ')}</td></tr>`).join('')}
+        ${glyphs.emptyGlyphs.length>20?`<tr><td colspan="3" style="color:var(--muted)">…and ${glyphs.emptyGlyphs.length-20} more</td></tr>`:''}
+      </tbody></table>`;
+  }
+
+  if(glyphs.outliers.length>0){
+    document.getElementById('outlier-section').innerHTML = `
+      <div class="cat-label" style="margin:12px 0 6px">Advance Width Outliers (vs. median ${glyphs.median})</div>
+      <table><thead><tr><th>Index</th><th>Name</th><th>Unicode</th><th>Adv. Width</th></tr></thead><tbody>
+        ${glyphs.outliers.slice(0,20).map(g=>`<tr><td>${g.index}</td><td><code>${esc(g.name)}</code></td><td>${g.unicodes.join(', ')}</td><td>${g.aw}</td></tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  allGlyphs = glyphs.glyphs;
+  glyphPage = 0;
+  renderGlyphPage();
+
+  document.getElementById('glyph-search').addEventListener('input', e=>{
+    const q = e.target.value.toLowerCase();
+    allGlyphs = glyphs.glyphs.filter(g=>
+      g.name.toLowerCase().includes(q) || g.unicodes.some(u=>u.toLowerCase().includes(q)));
+    glyphPage = 0;
+    renderGlyphPage();
+  });
+}
+
+function renderGlyphPage() {
+  const start = glyphPage*PAGE_SIZE, end = start+PAGE_SIZE;
+  const page  = allGlyphs.slice(start, end);
+  document.getElementById('glyph-tbody').innerHTML = page.map(g=>
+    `<tr><td>${g.index}</td><td><code>${esc(g.name)}</code></td>
+     <td style="font-family:monospace">${g.unicodes.join(', ')}</td>
+     <td>${g.aw??'—'}</td>
+     <td>${g.isKannada?'<span class="pill pill-info">✓</span>':''}</td></tr>`
+  ).join('');
+  const total = allGlyphs.length;
+  const pages = Math.ceil(total/PAGE_SIZE);
+  document.getElementById('glyph-pagination').innerHTML = total>PAGE_SIZE
+    ? `Page ${glyphPage+1}/${pages} — showing ${start+1}–${Math.min(end,total)} of ${total}
+       <button onclick="glyphPage=Math.max(0,glyphPage-1);renderGlyphPage()" style="margin-left:8px">‹ Prev</button>
+       <button onclick="glyphPage=Math.min(${pages-1},glyphPage+1);renderGlyphPage()" style="margin-left:4px">Next ›</button>`
+    : `${total} glyph(s)`;
+}
+
+function renderMetadata(metadata) {
+  document.getElementById('meta-tbody').innerHTML = Object.values(metadata.fields).map(f=>
+    `<tr><td>${esc(f.label)}</td>
+     <td>${f.value?esc(f.value):'<span style="color:var(--muted)">—</span>'}</td>
+     <td><span class="pill ${f.present?'pill-pass':'pill-warn'}">${f.present?'✓ Present':'! Missing'}</span></td></tr>`
+  ).join('');
+
+  if(metadata.os2){
+    const o=metadata.os2, h=metadata.head, p=metadata.post;
+    document.getElementById('os2-tbody').innerHTML = [
+      ['Units Per Em',    h?.unitsPerEm??'—'],
+      ['Weight Class',    o.weightClass],
+      ['Width Class',     o.widthClass],
+      ['Typo Ascender',   o.typoAscender],
+      ['Typo Descender',  o.typoDescender],
+      ['Cap Height',      o.capHeight??'—'],
+      ['x-Height',        o.xHeight??'—'],
+      ['Win Ascent',      o.winAscent],
+      ['Win Descent',     o.winDescent],
+      ['Italic Angle',    p?.italicAngle??'—'],
+      ['Kannada Unicode Range (bit 25)', `<span class="pill ${o.hasKannada?'pill-pass':'pill-fail'}">${o.hasKannada?'✓ Set':'✗ Not set'}</span>`],
+    ].map(([l,v])=>`<tr><td>${l}</td><td>${v}</td></tr>`).join('');
+  }
+}
+
+function renderIssues(issues) {
+  const icons={error:'⛔',warning:'⚠️',info:'ℹ️'};
+  document.getElementById('issue-list-wrap').innerHTML = issues.length===0
+    ? '<div class="badge badge-ok" style="display:inline-flex">✓ No issues — font passes all checks</div>'
+    : `<div class="issue-list">${issues.map(i=>`
+        <div class="issue-item ${i.sev}">
+          <span class="issue-icon">${icons[i.sev]||'•'}</span>
+          <div><div class="issue-cat">${esc(i.cat)}</div><div class="issue-msg">${esc(i.msg)}</div></div>
+        </div>`).join('')}</div>`;
+}
+
+function renderDiff(diff) {
+  const el = document.getElementById('diff-section');
+  el.style.display = 'block';
+  const dc = diff.delta>0?'pos':diff.delta<0?'neg':'neu';
+  const ds = diff.delta>0?'+':'';
+  el.innerHTML = `
+    <div class="diff-title">📊 Compared with Previous Version
+      <span class="delta ${dc}">${ds}${diff.delta} pts (${diff.old.score} → ${diff.new.score})</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;font-size:13px">
+      <div>
+        <div style="font-weight:700;margin-bottom:4px;color:var(--pass)">✓ Glyphs Added (${diff.glyphsAdded.length})</div>
+        ${diff.glyphsAdded.slice(0,8).map(r=>`<div>${r.ch} ${r.cpHex}</div>`).join('')||'<div style="color:var(--muted)">None</div>'}
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:4px;color:var(--fail)">✗ Glyphs Removed (${diff.glyphsRemoved.length})</div>
+        ${diff.glyphsRemoved.slice(0,8).map(r=>`<div>${r.ch} ${r.cpHex}</div>`).join('')||'<div style="color:var(--muted)">None</div>'}
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:4px;color:var(--pass)">✓ Features Added (${diff.featAdded.length})</div>
+        ${diff.featAdded.map(t=>`<code>${t}</code>`).join(' ')||'<span style="color:var(--muted)">None</span>'}
+        <div style="font-weight:700;margin:8px 0 4px;color:var(--fail)">✗ Features Removed (${diff.featRemoved.length})</div>
+        ${diff.featRemoved.map(t=>`<code>${t}</code>`).join(' ')||'<span style="color:var(--muted)">None</span>'}
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:4px;color:var(--pass)">✓ Issues Resolved (${diff.issuesResolved.length})</div>
+        ${diff.issuesResolved.slice(0,3).map(i=>`<div style="font-size:11px">${esc(i.message||i.msg)}</div>`).join('')||'<div style="color:var(--muted)">None</div>'}
+        <div style="font-weight:700;margin:8px 0 4px;color:var(--fail)">✗ Issues Introduced (${diff.issuesIntroduced.length})</div>
+        ${diff.issuesIntroduced.slice(0,3).map(i=>`<div style="font-size:11px">${esc(i.message||i.msg)}</div>`).join('')||'<div style="color:var(--muted)">None</div>'}
+      </div>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--muted)">
+      Previous: ${esc(diff.old.file)} · Current: ${esc(diff.new.file)}
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// HISTORY
+// ════════════════════════════════════════════════════════════════════════════
+
+function saveToHistory(report, fileName) {
+  try {
+    const history = JSON.parse(localStorage.getItem('kn_fqi_history')||'[]');
+    history.unshift({ ts: report.meta.timestamp, file: fileName, score: report.score.total,
+      grade: report.score.grade, report });
+    localStorage.setItem('kn_fqi_history', JSON.stringify(history.slice(0,20)));
+  } catch(e) {}
+  renderHistory();
+}
+
+function renderHistory() {
+  try {
+    const history = JSON.parse(localStorage.getItem('kn_fqi_history')||'[]');
+    if(!history.length) return;
+    const panel = document.getElementById('history-panel');
+    const list  = document.getElementById('history-list');
+    panel.style.display='block';
+    list.innerHTML = history.slice(0,5).map((h,i)=>`
+      <div class="history-item" onclick="loadHistoryItem(${i})">
+        <div class="history-score" style="color:${GRADE_COLORS[h.grade]||'#64748b'}">${h.score}</div>
+        <div class="history-meta">
+          <div class="history-name">${esc(h.file)}</div>
+          <div class="history-ts">${new Date(h.ts).toLocaleString()}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function loadHistoryItem(idx) {
+  try {
+    const history = JSON.parse(localStorage.getItem('kn_fqi_history')||'[]');
+    const item = history[idx];
+    if(!item) return;
+    currentReport = item.report;
+    renderReport(item.report);
+  } catch(e) {}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════════════════════════════════════════
+
+document.getElementById('tabs').addEventListener('click', e=>{
+  const tab = e.target.closest('.tab');
+  if(!tab) return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  tab.classList.add('active');
+  document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// ACTIONS
+// ════════════════════════════════════════════════════════════════════════════
+
+function exportJSON() {
+  if(!currentReport) return;
+  const blob = new Blob([JSON.stringify(currentReport,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const name = currentReport.meta.fontFile.replace(/\.[^.]+$/,'');
+  const ts   = new Date().toISOString().slice(0,10);
+  a.download = `${name}_fqi_${ts}.json`;
+  a.click();
+}
+
+function triggerCompare() {
+  document.getElementById('compare-input').click();
+}
+
+function resetTool() {
+  currentReport = null; currentFont = null; allGlyphs = [];
+  document.getElementById('main').style.display = 'none';
+  document.getElementById('drop-zone').style.display = 'flex';
+  document.getElementById('diff-section').style.display = 'none';
+  ['btn-export-json','btn-compare','btn-reset'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('file-input').value='';
+  document.getElementById('compare-input').value='';
+  renderHistory();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ════════════════════════════════════════════════════════════════════════════
+
+function statBox(num, label) {
+  return `<div class="stat-box"><div class="stat-num">${num??'—'}</div><div class="stat-label">${label}</div></div>`;
+}
+function esc(s) {
+  if(s==null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function groupBy(arr, key) {
+  return arr.reduce((a,i)=>{ const k=i[key]; (a[k]=a[k]||[]).push(i); return a; }, {});
+}
+
+// ── Init ──
+renderHistory();
+</script>
+</body>
+</html>
