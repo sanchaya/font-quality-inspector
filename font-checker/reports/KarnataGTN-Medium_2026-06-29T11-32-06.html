@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Font QA Report — Karnata GTN Medium</title>
+<style>
+  :root {
+    --bg: #ffffff; --surface: #f8fafc; --border: #e2e8f0;
+    --text: #0f172a; --muted: #64748b;
+    --pass: #16a34a; --fail: #dc2626; --warn: #d97706; --info: #2563eb;
+    --pass-bg: #dcfce7; --fail-bg: #fee2e2; --warn-bg: #fef9c3; --info-bg: #dbeafe;
+    --radius: 8px; --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; }
+
+  header { background: #0f172a; color: #fff; padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
+  header img { height: 32px; }
+  header .title { font-size: 18px; font-weight: 600; }
+  header .sub { font-size: 12px; color: #94a3b8; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
+
+  .score-card { display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; margin-bottom: 24px; }
+  .score-circle { width: 96px; height: 96px; border-radius: 50%; border: 6px solid #2563eb;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+  .score-num { font-size: 28px; font-weight: 700; color: #2563eb; line-height: 1; }
+  .score-grade { font-size: 14px; font-weight: 600; color: #2563eb; }
+  .score-meta h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .score-meta .ts { font-size: 11px; color: var(--muted); }
+  .score-breakdown { display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
+  .score-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .score-label { font-size: 12px; color: var(--muted); }
+  .score-bar-wrap { flex: 1; background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+  .score-bar { height: 100%; border-radius: 4px; background: #2563eb; }
+  .score-val { font-size: 12px; font-weight: 600; min-width: 32px; text-align: right; }
+
+  .issue-bar { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+    border-radius: 20px; font-size: 13px; font-weight: 600; }
+  .badge-error { background: var(--fail-bg); color: var(--fail); }
+  .badge-warning { background: var(--warn-bg); color: var(--warn); }
+  .badge-info { background: var(--info-bg); color: var(--info); }
+  .badge-ok { background: var(--pass-bg); color: var(--pass); }
+
+  .section { margin-bottom: 32px; }
+  .section-title { font-size: 16px; font-weight: 700; color: var(--text);
+    padding-bottom: 8px; border-bottom: 2px solid var(--border); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px; }
+  .section-title .tag { font-size: 11px; font-weight: 500; color: var(--muted);
+    background: var(--border); padding: 2px 8px; border-radius: 10px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--surface); text-align: left; padding: 8px 12px; font-size: 11px;
+       font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+       border-bottom: 2px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: var(--surface); }
+
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .pill-pass { background: var(--pass-bg); color: var(--pass); }
+  .pill-fail { background: var(--fail-bg); color: var(--fail); }
+  .pill-warn { background: var(--warn-bg); color: var(--warn); }
+  .pill-info { background: var(--info-bg); color: var(--info); }
+
+  .glyph-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+  .glyph-cell { width: 56px; height: 56px; border: 1px solid var(--border); border-radius: 6px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+  .glyph-cell.present { background: var(--pass-bg); border-color: #86efac; }
+  .glyph-cell.missing { background: var(--fail-bg); border-color: #fca5a5; }
+  .glyph-cell.revival { border-style: dashed; }
+  .glyph-char { font-size: 22px; line-height: 1; }
+  .glyph-cp { font-size: 9px; color: var(--muted); }
+  .glyph-cell .tooltip { display: none; position: absolute; bottom: calc(100% + 4px); left: 50%;
+    transform: translateX(-50%); background: #1e293b; color: #fff; font-size: 11px;
+    padding: 4px 8px; border-radius: 4px; white-space: nowrap; z-index: 10; }
+  .glyph-cell:hover .tooltip { display: block; }
+
+  .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+  .feature-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+  .feature-icon { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .feature-icon.pass { background: var(--pass); color: #fff; }
+  .feature-icon.fail { background: var(--fail); color: #fff; }
+  .feature-tag { font-family: monospace; font-size: 13px; font-weight: 700; }
+  .feature-name { font-size: 12px; font-weight: 600; }
+  .feature-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .feature-lookup { font-size: 11px; color: var(--pass); }
+
+  .issue-list { display: flex; flex-direction: column; gap: 8px; }
+  .issue-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px;
+    border-radius: var(--radius); border: 1px solid var(--border); }
+  .issue-item.error  { background: var(--fail-bg); border-color: #fca5a5; }
+  .issue-item.warning { background: var(--warn-bg); border-color: #fcd34d; }
+  .issue-item.info   { background: var(--info-bg); border-color: #93c5fd; }
+  .issue-icon { font-size: 16px; flex-shrink: 0; }
+  .issue-body .issue-cat { font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); }
+  .issue-body .issue-msg { font-size: 13px; margin-top: 2px; }
+
+  .lookup-row td:nth-child(2) { font-family: monospace; font-size: 12px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px; text-align: center; }
+  .stat-num { font-size: 28px; font-weight: 700; color: var(--text); }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  
+
+  .cat-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.06em; margin: 12px 0 6px; }
+
+  code { font-family: monospace; background: var(--surface); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px;
+    border-top: 1px solid var(--border); margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="title">ಕನ್ನಡ Font Quality Inspector</div>
+    <div class="sub">Sanchaya Font Tools · typetest.sanchaya.net</div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Score Card -->
+  <div class="score-card">
+    <div class="score-circle">
+      <div class="score-num">82</div>
+      <div class="score-grade">Grade B</div>
+    </div>
+    <div class="score-meta">
+      <h2>Karnata GTN Medium</h2>
+      <div class="ts">Analyzed Jun 29, 2026, 05:02 PM · KarnataGTN-Medium.ttf</div>
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <span class="badge badge-error">⛔ 8 Errors</span>
+        <span class="badge badge-warning">⚠️ 3 Warnings</span>
+        
+        
+      </div>
+    </div>
+    <div class="score-breakdown">
+      <div class="score-row">
+    <span class="score-label">Unicode Coverage</span>
+    <div class="score-bar-wrap"><div class="score-bar" style="width:100%"></div></div>
+    <span class="score-val">40/40</span>
+  </div>
+      <div class="score-row">
+    <span class="score-label">OpenType Features</span>
+    <div class="score-bar-wrap"><div class="score-bar" style="width:47%"></div></div>
+    <span class="score-val">14/30</span>
+  </div>
+      <div class="score-row">
+    <span class="score-label">Script Tables</span>
+    <div class="score-bar-wrap"><div class="score-bar" style="width:100%"></div></div>
+    <span class="score-val">10/10</span>
+  </div>
+      <div class="score-row">
+    <span class="score-label">Metadata</span>
+    <div class="score-bar-wrap"><div class="score-bar" style="width:80%"></div></div>
+    <span class="score-val">8/10</span>
+  </div>
+      <div class="score-row">
+    <span class="score-label">Revival/Archaic</span>
+    <div class="score-bar-wrap"><div class="score-bar" style="width:100%"></div></div>
+    <span class="score-val">10/10</span>
+  </div>
+    </div>
+  </div>
+
+  
+
+  <!-- Issues -->
+  <div class="section">
+    <div class="section-title">Issues <span class="tag">11 total</span></div>
+    <div class="issue-list"><div class="issue-item warning">
+    <span class="issue-icon">⚠️</span>
+    <div class="issue-body">
+      <div class="issue-cat">Metadata</div>
+      <div class="issue-msg">Missing metadata fields: Copyright, Trademark, Manufacturer, Description, Sample Text</div>
+    </div>
+  </div><div class="issue-item error">
+    <span class="issue-icon">⛔</span>
+    <div class="issue-body">
+      <div class="issue-cat">Metadata</div>
+      <div class="issue-msg">OS/2 Unicode range bit 25 (Kannada) is not set</div>
+    </div>
+  </div><div class="issue-item error">
+    <span class="issue-icon">⛔</span>
+    <div class="issue-body">
+      <div class="issue-cat">OpenType Features</div>
+      <div class="issue-msg">Missing required feature &quot;nukt&quot; (Nukta Forms): Nukta + consonant → modified consonant glyph</div>
+    </div>
+  </div><div class="issue-item error">
+    <span class="issue-icon">⛔</span>
+    <div class="issue-body">
+      <div class="issue-cat">OpenType Features</div>
+      <div class="issue-msg">Missing required feature &quot;vatu&quot; (Vattu Variants): Below-base Ra (vattu) joining forms</div>
+    </div>
+  </div><div class="issue-item error">
+    <span class="issue-icon">⛔</span>
+    <div class="issue-body">
+      <div class="issue-cat">OpenType Features</div>
+      <div class="issue-msg">Missing required feature &quot;cjct&quot; (Conjunct Forms): Full conjunct ligatures (ottakshara)</div>
+    </div>
+  </div><div class="issue-item error">
+    <span class="issue-icon">⛔</span>
+    <div class="issue-body">
+      <div class="issue-cat">OpenType Features</div>
+      <div class="issue-msg">Missing required feature &quot;pres&quot; (Pre-base Substitutions): Matras appearing before base consonant</div>
+    </div>
+  </div><div class="issue-item error">
+    <span class="issue-icon">⛔</span>
+    <div class="issue-body">
+      <div class="issue-cat">OpenType Features</div>
+      <div class="issue-msg">Missing required feature &quot;abvs&quot; (Above-base Substitutions): Anusvara, chandrabindu above base</div>
+    </div>
+  </div><div class="issue-item error">
+    <span class="issue-icon">⛔</span>
+    <div class="issue-body">
+      <div class="issue-cat">OpenType Features</div>
+      <div class="issue-msg">Missing required feature &quot;mark&quot; (Mark Positioning): Diacritic attachment to base glyphs</div>
+    </div>
+  </div><div class="issue-item error">
+    <span class="issue-icon">⛔</span>
+    <div class="issue-body">
+      <div class="issue-cat">GPOS</div>
+      <div class="issue-msg">No Mark-to-Base positioning (lookup type 4) found – vowel signs may not attach correctly</div>
+    </div>
+  </div><div class="issue-item warning">
+    <span class="issue-icon">⚠️</span>
+    <div class="issue-body">
+      <div class="issue-cat">Glyphs</div>
+      <div class="issue-msg">4 glyph(s) have Unicode mappings but no path data (e.g. .null, uni000D, space, uni00A0)</div>
+    </div>
+  </div><div class="issue-item warning">
+    <span class="issue-icon">⚠️</span>
+    <div class="issue-body">
+      <div class="issue-cat">Glyphs</div>
+      <div class="issue-msg">9 Kannada glyph(s) have unusual advance widths vs. median (784 units)</div>
+    </div>
+  </div></div>
+  </div>
+
+  <!-- Unicode Coverage -->
+  <div class="section">
+    <div class="section-title">Kannada Unicode Coverage
+      <span class="tag">88/88 present</span>
+      <span class="tag" style="color:var(--pass)">
+        Required: 74/74
+      </span>
+    </div>
+    <div class="stat-grid" style="margin-bottom:20px">
+      <div class="stat-box"><div class="stat-num">88</div><div class="stat-label">Glyphs Present</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">Glyphs Missing</div></div>
+      <div class="stat-box"><div class="stat-num">74</div><div class="stat-label">Required Present</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">Required Missing</div></div>
+      <div class="stat-box"><div class="stat-num">12</div><div class="stat-label">Revival Present</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">Revival Missing</div></div>
+    </div>
+    <div class="cat-label">Independent Vowels</div>
+    <div class="glyph-grid" style="margin-bottom:16px">
+      
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಅ</div>
+          <div class="glyph-cp">U+0C85</div>
+          <div class="tooltip">Letter A</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಆ</div>
+          <div class="glyph-cp">U+0C86</div>
+          <div class="tooltip">Letter AA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಇ</div>
+          <div class="glyph-cp">U+0C87</div>
+          <div class="tooltip">Letter I</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಈ</div>
+          <div class="glyph-cp">U+0C88</div>
+          <div class="tooltip">Letter II</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಉ</div>
+          <div class="glyph-cp">U+0C89</div>
+          <div class="tooltip">Letter U</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಊ</div>
+          <div class="glyph-cp">U+0C8A</div>
+          <div class="tooltip">Letter UU</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಋ</div>
+          <div class="glyph-cp">U+0C8B</div>
+          <div class="tooltip">Letter Vocalic R</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ಌ</div>
+          <div class="glyph-cp">U+0C8C</div>
+          <div class="tooltip">Letter Vocalic L (revival)</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಎ</div>
+          <div class="glyph-cp">U+0C8E</div>
+          <div class="tooltip">Letter E</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಏ</div>
+          <div class="glyph-cp">U+0C8F</div>
+          <div class="tooltip">Letter EE</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಐ</div>
+          <div class="glyph-cp">U+0C90</div>
+          <div class="tooltip">Letter AI</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಒ</div>
+          <div class="glyph-cp">U+0C92</div>
+          <div class="tooltip">Letter O</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಓ</div>
+          <div class="glyph-cp">U+0C93</div>
+          <div class="tooltip">Letter OO</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಔ</div>
+          <div class="glyph-cp">U+0C94</div>
+          <div class="tooltip">Letter AU</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೠ</div>
+          <div class="glyph-cp">U+0CE0</div>
+          <div class="tooltip">Letter Vocalic RR (revival)</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೡ</div>
+          <div class="glyph-cp">U+0CE1</div>
+          <div class="tooltip">Letter Vocalic LL (revival)</div>
+        </div>
+    </div><div class="cat-label">Consonants</div>
+    <div class="glyph-grid" style="margin-bottom:16px">
+      
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಕ</div>
+          <div class="glyph-cp">U+0C95</div>
+          <div class="tooltip">Letter KA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಖ</div>
+          <div class="glyph-cp">U+0C96</div>
+          <div class="tooltip">Letter KHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಗ</div>
+          <div class="glyph-cp">U+0C97</div>
+          <div class="tooltip">Letter GA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಘ</div>
+          <div class="glyph-cp">U+0C98</div>
+          <div class="tooltip">Letter GHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಙ</div>
+          <div class="glyph-cp">U+0C99</div>
+          <div class="tooltip">Letter NGA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಚ</div>
+          <div class="glyph-cp">U+0C9A</div>
+          <div class="tooltip">Letter CA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಛ</div>
+          <div class="glyph-cp">U+0C9B</div>
+          <div class="tooltip">Letter CHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಜ</div>
+          <div class="glyph-cp">U+0C9C</div>
+          <div class="tooltip">Letter JA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಝ</div>
+          <div class="glyph-cp">U+0C9D</div>
+          <div class="tooltip">Letter JHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಞ</div>
+          <div class="glyph-cp">U+0C9E</div>
+          <div class="tooltip">Letter NYA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಟ</div>
+          <div class="glyph-cp">U+0C9F</div>
+          <div class="tooltip">Letter TTA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಠ</div>
+          <div class="glyph-cp">U+0CA0</div>
+          <div class="tooltip">Letter TTHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಡ</div>
+          <div class="glyph-cp">U+0CA1</div>
+          <div class="tooltip">Letter DDA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಢ</div>
+          <div class="glyph-cp">U+0CA2</div>
+          <div class="tooltip">Letter DDHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಣ</div>
+          <div class="glyph-cp">U+0CA3</div>
+          <div class="tooltip">Letter NNA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ತ</div>
+          <div class="glyph-cp">U+0CA4</div>
+          <div class="tooltip">Letter TA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಥ</div>
+          <div class="glyph-cp">U+0CA5</div>
+          <div class="tooltip">Letter THA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ದ</div>
+          <div class="glyph-cp">U+0CA6</div>
+          <div class="tooltip">Letter DA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಧ</div>
+          <div class="glyph-cp">U+0CA7</div>
+          <div class="tooltip">Letter DHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ನ</div>
+          <div class="glyph-cp">U+0CA8</div>
+          <div class="tooltip">Letter NA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಪ</div>
+          <div class="glyph-cp">U+0CAA</div>
+          <div class="tooltip">Letter PA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಫ</div>
+          <div class="glyph-cp">U+0CAB</div>
+          <div class="tooltip">Letter PHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಬ</div>
+          <div class="glyph-cp">U+0CAC</div>
+          <div class="tooltip">Letter BA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಭ</div>
+          <div class="glyph-cp">U+0CAD</div>
+          <div class="tooltip">Letter BHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಮ</div>
+          <div class="glyph-cp">U+0CAE</div>
+          <div class="tooltip">Letter MA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಯ</div>
+          <div class="glyph-cp">U+0CAF</div>
+          <div class="tooltip">Letter YA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ರ</div>
+          <div class="glyph-cp">U+0CB0</div>
+          <div class="tooltip">Letter RA</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ಱ</div>
+          <div class="glyph-cp">U+0CB1</div>
+          <div class="tooltip">Letter RRA (Archaic) (revival)</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಲ</div>
+          <div class="glyph-cp">U+0CB2</div>
+          <div class="tooltip">Letter LA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಳ</div>
+          <div class="glyph-cp">U+0CB3</div>
+          <div class="tooltip">Letter LLA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ವ</div>
+          <div class="glyph-cp">U+0CB5</div>
+          <div class="tooltip">Letter VA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಶ</div>
+          <div class="glyph-cp">U+0CB6</div>
+          <div class="tooltip">Letter SHA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಷ</div>
+          <div class="glyph-cp">U+0CB7</div>
+          <div class="tooltip">Letter SSA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಸ</div>
+          <div class="glyph-cp">U+0CB8</div>
+          <div class="tooltip">Letter SA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಹ</div>
+          <div class="glyph-cp">U+0CB9</div>
+          <div class="tooltip">Letter HA</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೞ</div>
+          <div class="glyph-cp">U+0CDE</div>
+          <div class="tooltip">Letter Obsolete LLA (revival)</div>
+        </div>
+    </div><div class="cat-label">Dependent Vowel Signs (Matras)</div>
+    <div class="glyph-grid" style="margin-bottom:16px">
+      
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಾ</div>
+          <div class="glyph-cp">U+0CBE</div>
+          <div class="tooltip">Vowel Sign AA</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಿ</div>
+          <div class="glyph-cp">U+0CBF</div>
+          <div class="tooltip">Vowel Sign I</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ೀ</div>
+          <div class="glyph-cp">U+0CC0</div>
+          <div class="tooltip">Vowel Sign II</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ು</div>
+          <div class="glyph-cp">U+0CC1</div>
+          <div class="tooltip">Vowel Sign U</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ೂ</div>
+          <div class="glyph-cp">U+0CC2</div>
+          <div class="tooltip">Vowel Sign UU</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ೃ</div>
+          <div class="glyph-cp">U+0CC3</div>
+          <div class="tooltip">Vowel Sign Vocalic R</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೄ</div>
+          <div class="glyph-cp">U+0CC4</div>
+          <div class="tooltip">Vowel Sign Vocalic RR (revival)</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ೆ</div>
+          <div class="glyph-cp">U+0CC6</div>
+          <div class="tooltip">Vowel Sign E</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ೇ</div>
+          <div class="glyph-cp">U+0CC7</div>
+          <div class="tooltip">Vowel Sign EE</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ೈ</div>
+          <div class="glyph-cp">U+0CC8</div>
+          <div class="tooltip">Vowel Sign AI</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ೊ</div>
+          <div class="glyph-cp">U+0CCA</div>
+          <div class="tooltip">Vowel Sign O</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ೋ</div>
+          <div class="glyph-cp">U+0CCB</div>
+          <div class="tooltip">Vowel Sign OO</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ೌ</div>
+          <div class="glyph-cp">U+0CCC</div>
+          <div class="tooltip">Vowel Sign AU</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೢ</div>
+          <div class="glyph-cp">U+0CE2</div>
+          <div class="tooltip">Vowel Sign Vocalic L (revival)</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೣ</div>
+          <div class="glyph-cp">U+0CE3</div>
+          <div class="tooltip">Vowel Sign Vocalic LL (revival)</div>
+        </div>
+    </div><div class="cat-label">Signs & Diacritics</div>
+    <div class="glyph-grid" style="margin-bottom:16px">
+      
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಀ</div>
+          <div class="glyph-cp">U+0C80</div>
+          <div class="tooltip">Spacing Candrabindu</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಁ</div>
+          <div class="glyph-cp">U+0C81</div>
+          <div class="tooltip">Candrabindu</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಂ</div>
+          <div class="glyph-cp">U+0C82</div>
+          <div class="tooltip">Anusvara</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಃ</div>
+          <div class="glyph-cp">U+0C83</div>
+          <div class="tooltip">Visarga</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">಼</div>
+          <div class="glyph-cp">U+0CBC</div>
+          <div class="tooltip">Sign Nukta</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">ಽ</div>
+          <div class="glyph-cp">U+0CBD</div>
+          <div class="tooltip">Sign Avagraha</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">್</div>
+          <div class="glyph-cp">U+0CCD</div>
+          <div class="tooltip">Sign Virama (Halant)</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೕ</div>
+          <div class="glyph-cp">U+0CD5</div>
+          <div class="tooltip">Length Mark (revival)</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೖ</div>
+          <div class="glyph-cp">U+0CD6</div>
+          <div class="tooltip">AI Length Mark (revival)</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೱ</div>
+          <div class="glyph-cp">U+0CF1</div>
+          <div class="tooltip">Sign Jihvamuliya (revival)</div>
+        </div>
+        <div class="glyph-cell present revival">
+          <div class="glyph-char">ೲ</div>
+          <div class="glyph-cp">U+0CF2</div>
+          <div class="tooltip">Sign Upadhmaniya (revival)</div>
+        </div>
+    </div><div class="cat-label">Digits</div>
+    <div class="glyph-grid" style="margin-bottom:16px">
+      
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೦</div>
+          <div class="glyph-cp">U+0CE6</div>
+          <div class="tooltip">Digit Zero</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೧</div>
+          <div class="glyph-cp">U+0CE7</div>
+          <div class="tooltip">Digit One</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೨</div>
+          <div class="glyph-cp">U+0CE8</div>
+          <div class="tooltip">Digit Two</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೩</div>
+          <div class="glyph-cp">U+0CE9</div>
+          <div class="tooltip">Digit Three</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೪</div>
+          <div class="glyph-cp">U+0CEA</div>
+          <div class="tooltip">Digit Four</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೫</div>
+          <div class="glyph-cp">U+0CEB</div>
+          <div class="tooltip">Digit Five</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೬</div>
+          <div class="glyph-cp">U+0CEC</div>
+          <div class="tooltip">Digit Six</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೭</div>
+          <div class="glyph-cp">U+0CED</div>
+          <div class="tooltip">Digit Seven</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೮</div>
+          <div class="glyph-cp">U+0CEE</div>
+          <div class="tooltip">Digit Eight</div>
+        </div>
+        <div class="glyph-cell present ">
+          <div class="glyph-char">೯</div>
+          <div class="glyph-cp">U+0CEF</div>
+          <div class="tooltip">Digit Nine</div>
+        </div>
+    </div>
+  </div>
+
+  <!-- OpenType Features -->
+  <div class="section">
+    <div class="section-title">OpenType Feature Coverage
+      <span class="tag">5/11 required present</span>
+    </div>
+    <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;">Required Features</div>
+    <div class="feature-grid" style="margin-bottom:20px">
+      <div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">nukt</span></div>
+      <div class="feature-name">Nukta Forms</div>
+      <div class="feature-desc">Nukta + consonant → modified consonant glyph</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon pass">✓</div>
+    <div>
+      <div><span class="feature-tag">akhn</span></div>
+      <div class="feature-name">Akhand</div>
+      <div class="feature-desc">Mandatory ligatures: ಕ್ಷ (ksha), ಜ್ಞ (jnya)</div>
+      <div class="feature-lookup">↳ 4 lookup(s)</div>
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon pass">✓</div>
+    <div>
+      <div><span class="feature-tag">blwf</span></div>
+      <div class="feature-name">Below-base Forms</div>
+      <div class="feature-desc">Consonants that descend below the baseline</div>
+      <div class="feature-lookup">↳ 4 lookup(s)</div>
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">vatu</span></div>
+      <div class="feature-name">Vattu Variants</div>
+      <div class="feature-desc">Below-base Ra (vattu) joining forms</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">cjct</span></div>
+      <div class="feature-name">Conjunct Forms</div>
+      <div class="feature-desc">Full conjunct ligatures (ottakshara)</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">pres</span></div>
+      <div class="feature-name">Pre-base Substitutions</div>
+      <div class="feature-desc">Matras appearing before base consonant</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">abvs</span></div>
+      <div class="feature-name">Above-base Substitutions</div>
+      <div class="feature-desc">Anusvara, chandrabindu above base</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon pass">✓</div>
+    <div>
+      <div><span class="feature-tag">blws</span></div>
+      <div class="feature-name">Below-base Substitutions</div>
+      <div class="feature-desc">U, UU, R matras below consonant</div>
+      <div class="feature-lookup">↳ 4 lookup(s)</div>
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon pass">✓</div>
+    <div>
+      <div><span class="feature-tag">psts</span></div>
+      <div class="feature-name">Post-base Substitutions</div>
+      <div class="feature-desc">AA and other post-base matras</div>
+      <div class="feature-lookup">↳ 4 lookup(s)</div>
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon pass">✓</div>
+    <div>
+      <div><span class="feature-tag">haln</span></div>
+      <div class="feature-name">Halant Forms</div>
+      <div class="feature-desc">Explicit halant display (virama visible)</div>
+      <div class="feature-lookup">↳ 4 lookup(s)</div>
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">mark</span></div>
+      <div class="feature-name">Mark Positioning</div>
+      <div class="feature-desc">Diacritic attachment to base glyphs</div>
+      
+    </div>
+  </div>
+    </div>
+    <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;">Recommended / Optional Features</div>
+    <div class="feature-grid">
+      <div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">locl</span></div>
+      <div class="feature-name">Localized Forms</div>
+      <div class="feature-desc">Script/language-specific glyph variants</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon pass">✓</div>
+    <div>
+      <div><span class="feature-tag">rphf</span></div>
+      <div class="feature-name">Reph Form</div>
+      <div class="feature-desc">Ra-above-base (reph) form</div>
+      <div class="feature-lookup">↳ 4 lookup(s)</div>
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">half</span></div>
+      <div class="feature-name">Half Forms</div>
+      <div class="feature-desc">Half-consonant forms (less common in Kannada)</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">pstf</span></div>
+      <div class="feature-name">Post-base Forms</div>
+      <div class="feature-desc">Consonant forms that appear after the base</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">calt</span></div>
+      <div class="feature-name">Contextual Alternates</div>
+      <div class="feature-desc">Context-sensitive alternate glyphs</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">dist</span></div>
+      <div class="feature-name">Distances</div>
+      <div class="feature-desc">Inter-character spacing (preferred over kern for Indic)</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">kern</span></div>
+      <div class="feature-name">Kerning</div>
+      <div class="feature-desc">Pair-wise kerning adjustments</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">mkmk</span></div>
+      <div class="feature-name">Mark-to-mark</div>
+      <div class="feature-desc">Stacking diacritic positioning</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">liga</span></div>
+      <div class="feature-name">Standard Ligatures</div>
+      <div class="feature-desc">Optional common ligatures</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">ss01</span></div>
+      <div class="feature-name">Stylistic Set 01</div>
+      <div class="feature-desc">First stylistic alternate set</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">ss02</span></div>
+      <div class="feature-name">Stylistic Set 02</div>
+      <div class="feature-desc">Second stylistic alternate set</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">cv01</span></div>
+      <div class="feature-name">Character Variant 01</div>
+      <div class="feature-desc">Character-level variants</div>
+      
+    </div>
+  </div><div class="feature-item">
+    <div class="feature-icon fail">✗</div>
+    <div>
+      <div><span class="feature-tag">sups</span></div>
+      <div class="feature-name">Superscript</div>
+      <div class="feature-desc">Superscript numerals</div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+
+  <!-- Script Support -->
+  <div class="section">
+    <div class="section-title">Script & Language Tables</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+      <div>
+    <div class="cat-label">GSUB Script Records</div>
+    <table>
+      <thead><tr><th>Tag</th><th>Default LangSys</th><th>Lang Systems</th></tr></thead>
+      <tbody>
+        <tr>
+            <td><code>DFLT</code></td>
+            <td><span class="pill pill-pass">✓</span></td>
+            <td>—</td>
+          </tr><tr>
+            <td><code>knd2</code></td>
+            <td><span class="pill pill-pass">✓</span></td>
+            <td>—</td>
+          </tr><tr>
+            <td><code>knda</code></td>
+            <td><span class="pill pill-pass">✓</span></td>
+            <td>—</td>
+          </tr><tr>
+            <td><code>latn</code></td>
+            <td><span class="pill pill-pass">✓</span></td>
+            <td>—</td>
+          </tr>
+      </tbody>
+    </table>
+  </div>
+      <div>
+    <div class="cat-label">GPOS Script Records</div>
+    <table>
+      <thead><tr><th>Tag</th><th>Default LangSys</th><th>Lang Systems</th></tr></thead>
+      <tbody>
+        <tr><td colspan="3" style="color:var(--muted)">None</td></tr>
+      </tbody>
+    </table>
+  </div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+      <span class="pill pill-pass">
+        ✓ knda Script Record
+      </span>
+      <span class="pill pill-pass">
+        ✓ DFLT Script Record
+      </span>
+      <span class="pill pill-pass">
+        ✓ GPOS Table
+      </span>
+      <span class="pill pill-fail">
+        ✗ Mark-to-Base Positioning
+      </span>
+      <span class="pill pill-warn">
+        ! Mark-to-Mark
+      </span>
+    </div>
+  </div>
+
+  <!-- GSUB Analysis -->
+  <div class="section">
+    <div class="section-title">GSUB — Substitution Rules
+      <span class="tag">8 lookups · 470 rules</span>
+    </div>
+    
+    <div class="stat-grid" style="margin-bottom:20px">
+      <div class="stat-box"><div class="stat-num">8</div><div class="stat-label">Total Lookups</div></div>
+      <div class="stat-box"><div class="stat-num">470</div><div class="stat-label">Total Rules</div></div>
+      <div class="stat-box"><div class="stat-num">3</div><div class="stat-label">Lookup Types</div></div>
+      <div class="stat-box"><div class="stat-num">28</div><div class="stat-label">Feature Records</div></div>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Type</th><th>Subtables</th><th>Rules</th></tr></thead>
+      <tbody class="lookup-row">
+        <tr><td>0</td><td>Single (1→1)</td><td>1</td><td>1</td></tr><tr><td>1</td><td>Ligature (many→1)</td><td>1</td><td>306</td></tr><tr><td>2</td><td>Ligature (many→1)</td><td>1</td><td>34</td></tr><tr><td>3</td><td>Ligature (many→1)</td><td>1</td><td>102</td></tr><tr><td>4</td><td>Ligature (many→1)</td><td>1</td><td>1</td></tr><tr><td>5</td><td>Ligature (many→1)</td><td>1</td><td>22</td></tr><tr><td>6</td><td>Chained Context</td><td>3</td><td>3</td></tr><tr><td>7</td><td>Single (1→1)</td><td>1</td><td>1</td></tr>
+        
+      </tbody>
+    </table>
+    <div style="margin-top:16px">
+      <table>
+        <thead><tr><th>Feature</th><th>Lookup Indices</th></tr></thead>
+        <tbody>
+          <tr><td><code>aalt</code></td><td style="font-family:monospace;font-size:12px">0</td></tr><tr><td><code>akhn</code></td><td style="font-family:monospace;font-size:12px">5</td></tr><tr><td><code>blwf</code></td><td style="font-family:monospace;font-size:12px">3</td></tr><tr><td><code>blws</code></td><td style="font-family:monospace;font-size:12px">6</td></tr><tr><td><code>haln</code></td><td style="font-family:monospace;font-size:12px">2</td></tr><tr><td><code>psts</code></td><td style="font-family:monospace;font-size:12px">1</td></tr><tr><td><code>rphf</code></td><td style="font-family:monospace;font-size:12px">4</td></tr>
+        </tbody>
+      </table>
+    </div>
+    
+  </div>
+
+  <!-- GPOS Analysis -->
+  <div class="section">
+    <div class="section-title">GPOS — Positioning Rules
+      <span class="tag">0 lookups · 0 mark anchors</span>
+    </div>
+    
+    <div class="stat-grid" style="margin-bottom:20px">
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">Total Lookups</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">Mark Anchors</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">Lookup Types</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">Feature Records</div></div>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Type</th><th>Subtables</th></tr></thead>
+      <tbody class="lookup-row">
+        
+      </tbody>
+    </table>
+    
+  </div>
+
+  <!-- Metadata -->
+  <div class="section">
+    <div class="section-title">Font Metadata</div>
+    <table>
+      <thead><tr><th>Field</th><th>Value</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Copyright</td><td><span style="color:var(--muted)">—</span></td>
+           <td><span class="pill pill-warn">! Missing</span></td></tr><tr><td>Font Family</td><td>Karnata GTN Med</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>Font Subfamily</td><td>Regular</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>Unique Identifier</td><td>Version 1.500;;KarnataGTN-Medium;2025;FL842</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>Full Name</td><td>Karnata GTN Medium</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>Version</td><td>Version 1.500</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>PostScript Name</td><td>KarnataGTN-Medium</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>Trademark</td><td><span style="color:var(--muted)">—</span></td>
+           <td><span class="pill pill-warn">! Missing</span></td></tr><tr><td>Manufacturer</td><td><span style="color:var(--muted)">—</span></td>
+           <td><span class="pill pill-warn">! Missing</span></td></tr><tr><td>Designer</td><td>Arun C Kallappanavar</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>Description</td><td><span style="color:var(--muted)">—</span></td>
+           <td><span class="pill pill-warn">! Missing</span></td></tr><tr><td>Manufacturer URL</td><td>https://sanchaya.org/</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>Designer URL</td><td>http://type.arunck.com/</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>License</td><td>This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://openfontlicense.org</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>License URL</td><td>https://openfontlicense.org</td>
+           <td><span class="pill pill-pass">✓ Present</span></td></tr><tr><td>Sample Text</td><td><span style="color:var(--muted)">—</span></td>
+           <td><span class="pill pill-warn">! Missing</span></td></tr>
+      </tbody>
+    </table>
+    
+    <div style="margin-top:20px">
+      <div class="cat-label">OS/2 Table</div>
+      <table>
+        <thead><tr><th>Property</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Units Per Em</td><td>1000</td></tr>
+          <tr><td>Weight Class</td><td>500</td></tr>
+          <tr><td>Width Class</td><td>5</td></tr>
+          <tr><td>Typo Ascender</td><td>1020</td></tr>
+          <tr><td>Typo Descender</td><td>-520</td></tr>
+          <tr><td>Cap Height</td><td>786</td></tr>
+          <tr><td>x Height</td><td>620</td></tr>
+          <tr><td>Kannada Unicode Range (bit 25)</td>
+            <td><span class="pill pill-fail">
+              ✗ Not set</span></td></tr>
+          <tr><td>Declared Unicode Ranges</td><td>Basic Latin, Latin-1 Supplement</td></tr>
+          <tr><td>Italic Angle</td><td>0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Glyph Stats -->
+  <div class="section">
+    <div class="section-title">Glyph Inventory
+      <span class="tag">800 total · 91 Kannada</span>
+    </div>
+    <div class="stat-grid" style="margin-bottom:20px">
+      <div class="stat-box"><div class="stat-num">800</div><div class="stat-label">Total Glyphs</div></div>
+      <div class="stat-box"><div class="stat-num">91</div><div class="stat-label">Kannada Glyphs</div></div>
+      <div class="stat-box"><div class="stat-num">4</div><div class="stat-label">Empty Glyphs</div></div>
+      <div class="stat-box"><div class="stat-num">1000</div><div class="stat-label">Units Per Em</div></div>
+      <div class="stat-box"><div class="stat-num">784</div><div class="stat-label">Median Advance Width</div></div>
+      <div class="stat-box"><div class="stat-num">9</div><div class="stat-label">Width Outliers</div></div>
+    </div>
+    
+    <div class="cat-label">Empty Glyphs (no path data)</div>
+    <table>
+      <thead><tr><th>Index</th><th>Name</th><th>Unicode</th><th>Advance Width</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code>.null</code></td>
+           <td>U+0000</td><td>0</td></tr><tr><td>2</td><td><code>uni000D</code></td>
+           <td>U+000D</td><td>250</td></tr><tr><td>3</td><td><code>space</code></td>
+           <td>U+0020</td><td>380</td></tr><tr><td>98</td><td><code>uni00A0</code></td>
+           <td>U+00A0</td><td>380</td></tr>
+        
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>
+  Generated by Kannada Font Quality Inspector v1.0.0 ·
+  <a href="https://typetest.sanchaya.net" style="color:var(--muted)">typetest.sanchaya.net</a> ·
+  Jun 29, 2026, 05:02 PM
+</footer>
+</body>
+</html>
