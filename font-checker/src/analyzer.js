@@ -669,4 +669,362 @@ function groupBy(arr, key) {
   }, {});
 }
 
-module.exports = { analyzeFont, compareReports, loadFont };
+// ─── Cross-Font Internals Comparison ─────────────────────────────────────────
+
+/**
+ * Build a map from glyph index → Unicode character for a font.
+ * Used to decode raw glyph IDs into human-readable characters.
+ */
+function buildGlyphCharMap(font) {
+  const map = {};
+  for (let i = 0; i < font.glyphs.length; i++) {
+    const g = font.glyphs.get(i);
+    if (!g) continue;
+    const uc = g.unicode != null ? g.unicode
+      : (g.unicodes && g.unicodes.length > 0 ? g.unicodes[0] : null);
+    if (uc != null) map[i] = uc;
+  }
+  return map;
+}
+
+/**
+ * Describe a single glyph ID as a human-readable string:
+ *   "ಕ (kaknda U+0C95)"
+ */
+function describeGlyph(glyphId, font, glyphCharMap) {
+  const cp = glyphCharMap[glyphId];
+  const g  = font.glyphs.get(glyphId);
+  const name = (g && g.name) ? g.name : `g${glyphId}`;
+  if (cp != null) {
+    const char = String.fromCodePoint(cp);
+    return `${char} (${name} U+${cp.toString(16).toUpperCase().padStart(4, '0')})`;
+  }
+  return name;
+}
+
+/**
+ * Extract concrete substitution rules for one GSUB feature tag.
+ * Returns an array of rule objects with human-readable display strings.
+ *
+ * @param {opentype.Font} font
+ * @param {string}        featureTag  e.g. 'akhn', 'blwf'
+ * @param {number}        limit       max rules to return (default 30)
+ */
+function extractGSUBRules(font, featureTag, limit = 30) {
+  const gsub = font.tables.gsub;
+  if (!gsub) return [];
+
+  const glyphCharMap = buildGlyphCharMap(font);
+
+  // Collect lookup indices for this feature
+  const features = gsub.features || gsub.featureList?.featureRecords || [];
+  const lookupIndices = new Set();
+  for (const feat of features) {
+    const tag = feat.tag || feat.featureTag;
+    if (tag !== featureTag) continue;
+    const idxs = feat.feature?.lookupListIndexes
+               || feat.feature?.lookupListIndices
+               || [];
+    for (const idx of idxs) lookupIndices.add(idx);
+  }
+
+  if (lookupIndices.size === 0) return [];
+
+  const allLookups = gsub.lookups || gsub.lookupList?.lookups || [];
+  const rules = [];
+
+  for (const li of [...lookupIndices].sort((a, b) => a - b)) {
+    if (rules.length >= limit) break;
+    const lookup = allLookups[li];
+    if (!lookup) continue;
+
+    const ltype = lookup.lookupType;
+
+    for (const sub of (lookup.subtables || [])) {
+      if (rules.length >= limit) break;
+
+      const covGlyphs = sub.coverage?.glyphs || [];
+
+      // ── Type 1: Single Substitution ──
+      if (ltype === 1) {
+        if (sub.substFormat === 2 && Array.isArray(sub.substitute)) {
+          for (let i = 0; i < covGlyphs.length && rules.length < limit; i++) {
+            const src = covGlyphs[i];
+            const dst = sub.substitute[i];
+            if (dst == null) continue;
+            const srcCp = glyphCharMap[src];
+            const dstCp = glyphCharMap[dst];
+            rules.push({
+              lookupIndex: li,
+              type: 'single',
+              inputCps:  srcCp != null ? [srcCp] : [],
+              outputCps: dstCp != null ? [dstCp] : [],
+              display: `${describeGlyph(src, font, glyphCharMap)}  →  ${describeGlyph(dst, font, glyphCharMap)}`,
+            });
+          }
+        } else if (sub.substFormat === 1 && sub.deltaGlyphId != null) {
+          for (let i = 0; i < covGlyphs.length && rules.length < limit; i++) {
+            const src = covGlyphs[i];
+            const dst = src + sub.deltaGlyphId;
+            rules.push({
+              lookupIndex: li,
+              type: 'single-delta',
+              inputCps:  glyphCharMap[src] != null ? [glyphCharMap[src]] : [],
+              outputCps: glyphCharMap[dst] != null ? [glyphCharMap[dst]] : [],
+              display: `${describeGlyph(src, font, glyphCharMap)}  →  ${describeGlyph(dst, font, glyphCharMap)} [delta ${sub.deltaGlyphId}]`,
+            });
+          }
+        }
+      }
+
+      // ── Type 4: Ligature Substitution ──
+      else if (ltype === 4) {
+        const ligSets = sub.ligatureSets || [];
+        for (let i = 0; i < covGlyphs.length && rules.length < limit; i++) {
+          const firstGlyph = covGlyphs[i];
+          const ligSet = ligSets[i] || [];
+          for (const lig of ligSet) {
+            if (rules.length >= limit) break;
+            const inputGlyphs  = [firstGlyph, ...(lig.components || [])];
+            const inputCps     = inputGlyphs.map(g => glyphCharMap[g]).filter(c => c != null);
+            const outputCp     = glyphCharMap[lig.ligGlyph];
+            const inputParts   = inputGlyphs.map(g => describeGlyph(g, font, glyphCharMap)).join('  +  ');
+            const outputStr    = describeGlyph(lig.ligGlyph, font, glyphCharMap);
+            // Try to build a character-level preview
+            const preview = inputCps.length === inputGlyphs.length
+              ? `${inputCps.map(c => String.fromCodePoint(c)).join(' + ')} → ${outputCp != null ? String.fromCodePoint(outputCp) : '?'}`
+              : null;
+            rules.push({
+              lookupIndex: li,
+              type: 'ligature',
+              inputCps,
+              outputCps: outputCp != null ? [outputCp] : [],
+              display:   `${inputParts}  →  ${outputStr}`,
+              preview,
+            });
+          }
+        }
+      }
+
+      // ── Type 2: Multiple Substitution ──
+      else if (ltype === 2) {
+        const seqs = sub.sequences || [];
+        for (let i = 0; i < covGlyphs.length && rules.length < limit; i++) {
+          const src = covGlyphs[i];
+          const seq = seqs[i] || [];
+          const outputParts = seq.map(g => describeGlyph(g, font, glyphCharMap)).join('  +  ');
+          rules.push({
+            lookupIndex: li,
+            type: 'multiple',
+            inputCps:  glyphCharMap[src] != null ? [glyphCharMap[src]] : [],
+            outputCps: seq.map(g => glyphCharMap[g]).filter(c => c != null),
+            display: `${describeGlyph(src, font, glyphCharMap)}  →  ${outputParts}`,
+          });
+        }
+      }
+    }
+  }
+
+  return rules;
+}
+
+/**
+ * Compare two fonts side-by-side.
+ * Returns a structured comparison object with diff, sample rules, and a fix plan.
+ *
+ * @param {string} pathA  Path to the font to fix (the weaker one)
+ * @param {string} pathB  Path to the reference font (the stronger one)
+ */
+function compareFont(pathA, pathB) {
+  const reportA = analyzeFont(pathA);
+  const reportB = analyzeFont(pathB);
+
+  const fontA = loadFont(pathA);
+  const fontB = loadFont(pathB);
+
+  // ── Coverage diff ────────────────────────────────────────────────────────
+  const presentA = new Set(reportA.coverage.all.filter(r => r.hasGlyph).map(r => r.cpHex));
+  const presentB = new Set(reportB.coverage.all.filter(r => r.hasGlyph).map(r => r.cpHex));
+
+  const covOnlyInB = reportB.coverage.all.filter(r => r.hasGlyph && !presentA.has(r.cpHex));
+  const covOnlyInA = reportA.coverage.all.filter(r => r.hasGlyph && !presentB.has(r.cpHex));
+
+  // ── GSUB feature diff ────────────────────────────────────────────────────
+  const gsubFeatsA = new Set(Object.keys(reportA.gsub.featureToLookups || {}));
+  const gsubFeatsB = new Set(Object.keys(reportB.gsub.featureToLookups || {}));
+
+  const gsubOnlyA = [...gsubFeatsA].filter(t => !gsubFeatsB.has(t));
+  const gsubOnlyB = [...gsubFeatsB].filter(t => !gsubFeatsA.has(t));
+  const gsubShared = {};
+
+  for (const tag of gsubFeatsA) {
+    if (!gsubFeatsB.has(tag)) continue;
+    const idxA = reportA.gsub.featureToLookups[tag] || [];
+    const idxB = reportB.gsub.featureToLookups[tag] || [];
+    const rulesA = idxA.reduce((s, i) => s + (reportA.gsub.lookups[i]?.ruleCount || 0), 0);
+    const rulesB = idxB.reduce((s, i) => s + (reportB.gsub.lookups[i]?.ruleCount || 0), 0);
+    gsubShared[tag] = { rulesA, rulesB, delta: rulesB - rulesA };
+  }
+
+  // ── GPOS feature diff ────────────────────────────────────────────────────
+  const gposFeatsA = new Set((reportA.gpos.featureRecords || []).map(f => f.tag));
+  const gposFeatsB = new Set((reportB.gpos.featureRecords || []).map(f => f.tag));
+  const gposOnlyB = [...gposFeatsB].filter(t => !gposFeatsA.has(t));
+  const gposOnlyA = [...gposFeatsA].filter(t => !gposFeatsB.has(t));
+
+  // ── Extract sample GSUB rules from B as blueprint ─────────────────────────
+  // For: (a) features in B but not A, and (b) shared features where B has 30%+ more rules
+  const { OT_FEATURES } = require('./kannada-data');
+  const priorityTags = OT_FEATURES.filter(f => f.required).map(f => f.tag);
+
+  const sampleRules = {};
+
+  // Features missing from A
+  for (const tag of gsubOnlyB) {
+    if (priorityTags.includes(tag) || gsubOnlyB.length <= 8) {
+      sampleRules[tag] = extractGSUBRules(fontB, tag, 15);
+    }
+  }
+
+  // Shared features where B is significantly richer
+  for (const [tag, info] of Object.entries(gsubShared)) {
+    if (info.rulesB > info.rulesA * 1.3 && info.delta >= 3) {
+      sampleRules[tag] = extractGSUBRules(fontB, tag, 10);
+    }
+  }
+
+  // ── Generate fix action plan ──────────────────────────────────────────────
+  const fixPlan = generateComparisonFixPlan({
+    reportA, reportB,
+    gsubOnlyB, gposOnlyB,
+    gsubShared,
+    covOnlyInB,
+    sampleRules,
+    priorityTags,
+  });
+
+  return {
+    meta: {
+      tool:      'Kannada Font Quality Inspector — Cross-Font Comparison',
+      version:   '1.1.0',
+      timestamp: new Date().toISOString(),
+    },
+    fontA: { path: pathA, report: reportA },
+    fontB: { path: pathB, report: reportB },
+    diff: {
+      scoreDelta: reportB.score.total - reportA.score.total,
+      coverage: {
+        onlyInA:  covOnlyInA,
+        onlyInB:  covOnlyInB,
+        inBoth:   [...presentA].filter(cp => presentB.has(cp)).length,
+      },
+      gsub: {
+        onlyInA:  gsubOnlyA,
+        onlyInB:  gsubOnlyB,
+        shared:   gsubShared,
+      },
+      gpos: {
+        onlyInA:  gposOnlyA,
+        onlyInB:  gposOnlyB,
+      },
+      sampleRules,
+      fixPlan,
+    },
+  };
+}
+
+/**
+ * Generate a prioritized list of fixes Font A needs to match Font B's quality.
+ */
+function generateComparisonFixPlan({ reportA, reportB, gsubOnlyB, gposOnlyB, gsubShared, covOnlyInB, sampleRules, priorityTags }) {
+  const plan = [];
+
+  // 1. Critical missing glyphs
+  const criticalMissingGlyphs = covOnlyInB.filter(r => r.required);
+  if (criticalMissingGlyphs.length > 0) {
+    plan.push({
+      severity: 'critical',
+      category: 'Unicode Coverage',
+      action: `Add ${criticalMissingGlyphs.length} missing required glyph(s)`,
+      details: criticalMissingGlyphs.map(r => `${r.char} ${r.cpHex} – ${r.name}`),
+    });
+  }
+  const revivalMissingGlyphs = covOnlyInB.filter(r => r.revival && !r.required);
+  if (revivalMissingGlyphs.length > 0) {
+    plan.push({
+      severity: 'info',
+      category: 'Unicode Coverage',
+      action: `Add ${revivalMissingGlyphs.length} revival/archaic glyph(s) that B supports`,
+      details: revivalMissingGlyphs.map(r => `${r.char} ${r.cpHex} – ${r.name}`),
+    });
+  }
+
+  // 2. Missing required GSUB features
+  const missingRequiredGSUB = gsubOnlyB.filter(t => priorityTags.includes(t));
+  for (const tag of missingRequiredGSUB) {
+    const rules = sampleRules[tag] || [];
+    plan.push({
+      severity: 'critical',
+      category: 'GSUB Features',
+      action: `Add required GSUB feature "${tag}"`,
+      details: [
+        `Font B has ${rules.length}+ rules in this feature.`,
+        rules.length > 0 ? `Sample rules from Font B (blueprint):` : '',
+        ...rules.slice(0, 5).map(r => r.preview || r.display),
+      ].filter(Boolean),
+      hasSampleRules: rules.length > 0,
+      sampleCount: rules.length,
+      tag,
+    });
+  }
+
+  // 3. Missing recommended GSUB features
+  const missingOptionalGSUB = gsubOnlyB.filter(t => !priorityTags.includes(t));
+  if (missingOptionalGSUB.length > 0) {
+    plan.push({
+      severity: 'warning',
+      category: 'GSUB Features',
+      action: `Add optional GSUB features present in B: ${missingOptionalGSUB.join(', ')}`,
+      details: [],
+    });
+  }
+
+  // 4. Shared features with significantly fewer rules
+  const underservedFeatures = Object.entries(gsubShared)
+    .filter(([, info]) => info.delta >= 5 && info.rulesB > info.rulesA * 1.2)
+    .sort(([, a], [, b]) => b.delta - a.delta);
+
+  for (const [tag, info] of underservedFeatures.slice(0, 5)) {
+    const rules = sampleRules[tag] || [];
+    const sev = priorityTags.includes(tag) ? 'warning' : 'info';
+    plan.push({
+      severity: sev,
+      category: 'GSUB Rule Counts',
+      action: `Expand "${tag}" rules: A has ${info.rulesA}, B has ${info.rulesB} (+${info.delta} more)`,
+      details: rules.slice(0, 4).map(r => r.preview || r.display),
+      hasSampleRules: rules.length > 0,
+      tag,
+    });
+  }
+
+  // 5. Missing GPOS features
+  const missingGPOS = gposOnlyB.filter(t => ['mark', 'mkmk', 'abvm', 'blwm'].includes(t));
+  for (const tag of missingGPOS) {
+    const desc = {
+      mark: 'Mark-to-base positioning — vowel signs won\'t attach correctly without this',
+      mkmk: 'Mark-to-mark — stacking diacritics will be mispositioned',
+      abvm: 'Above-base mark positioning',
+      blwm: 'Below-base mark positioning',
+    }[tag] || '';
+    plan.push({
+      severity: 'critical',
+      category: 'GPOS Features',
+      action: `Add GPOS feature "${tag}"${desc ? ` — ${desc}` : ''}`,
+      details: [`Font B uses this for correct diacritic attachment.`],
+    });
+  }
+
+  return plan;
+}
+
+module.exports = { analyzeFont, compareReports, compareFont, extractGSUBRules, loadFont };

@@ -513,4 +513,404 @@ function formatDate(iso) {
   });
 }
 
-module.exports = { renderHtmlReport };
+// ─── Cross-Font Comparison Report ─────────────────────────────────────────────
+
+/**
+ * Render a self-contained HTML comparison report for two fonts.
+ * @param {object} comparison  Return value of compareFont()
+ */
+function renderComparisonReport(comparison) {
+  const { diff, fontA, fontB, meta } = comparison;
+  const rA = fontA.report;
+  const rB = fontB.report;
+
+  const nameA = rA.metadata.fields.fullName?.value || rA.metadata.fields.fontFamily?.value || rA.meta.fontFile;
+  const nameB = rB.metadata.fields.fullName?.value || rB.metadata.fields.fontFamily?.value || rB.meta.fontFile;
+
+  const gradeColorA = gradeColor(rA.score.grade);
+  const gradeColorB = gradeColor(rB.score.grade);
+
+  const { OT_FEATURES } = require('./kannada-data');
+  const requiredTags = new Set(OT_FEATURES.filter(f => f.required).map(f => f.tag));
+  const featureDesc  = Object.fromEntries(OT_FEATURES.map(f => [f.tag, { name: f.name, desc: f.desc }]));
+
+  // Severity icon helper
+  function sevIcon(sev) {
+    return { critical: '⛔', warning: '⚠️', info: 'ℹ️' }[sev] || '•';
+  }
+  function sevClass(sev) {
+    return { critical: 'error', warning: 'warning', info: 'info' }[sev] || 'info';
+  }
+
+  // Build GSUB combined feature tag list
+  const allGsubTags = [...new Set([
+    ...Object.keys(diff.gsub.shared || {}),
+    ...(diff.gsub.onlyInA || []),
+    ...(diff.gsub.onlyInB || []),
+    ...OT_FEATURES.filter(f => f.stage < 3).map(f => f.tag),
+  ])].sort();
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Font Comparison — ${esc(nameA)} vs ${esc(nameB)}</title>
+<style>
+  :root {
+    --bg: #ffffff; --surface: #f8fafc; --border: #e2e8f0;
+    --text: #0f172a; --muted: #64748b;
+    --pass: #16a34a; --fail: #dc2626; --warn: #d97706; --info: #2563eb;
+    --pass-bg: #dcfce7; --fail-bg: #fee2e2; --warn-bg: #fef9c3; --info-bg: #dbeafe;
+    --a: #2563eb; --b: #9333ea;
+    --a-bg: #dbeafe; --b-bg: #f3e8ff;
+    --radius: 8px; --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; }
+
+  header { background: #0f172a; color: #fff; padding: 16px 32px; }
+  header .title { font-size: 18px; font-weight: 700; }
+  header .sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+  .container { max-width: 1160px; margin: 0 auto; padding: 24px 32px; }
+
+  /* Hero comparison cards */
+  .hero { display: grid; grid-template-columns: 1fr 56px 1fr; gap: 0; align-items: stretch; margin-bottom: 28px; }
+  .hero-vs { display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--muted); font-size: 18px; }
+  .font-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; background: var(--surface); }
+  .font-card.card-a { border-left: 4px solid var(--a); }
+  .font-card.card-b { border-left: 4px solid var(--b); }
+  .font-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+    padding: 2px 8px; border-radius: 10px; display: inline-block; margin-bottom: 6px; }
+  .label-a { background: var(--a-bg); color: var(--a); }
+  .label-b { background: var(--b-bg); color: var(--b); }
+  .font-name { font-size: 17px; font-weight: 800; margin-bottom: 2px; }
+  .font-file { font-size: 11px; color: var(--muted); font-family: monospace; margin-bottom: 12px; }
+  .score-row { display: flex; align-items: center; gap: 14px; }
+  .score-circle { width: 72px; height: 72px; border-radius: 50%; border: 4px solid;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+  .score-num { font-size: 22px; font-weight: 800; line-height: 1; }
+  .score-grade { font-size: 11px; font-weight: 700; }
+  .score-bars { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+  .sbar { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .sbar-lbl { width: 100px; color: var(--muted); flex-shrink: 0; }
+  .sbar-track { flex: 1; background: var(--border); border-radius: 3px; height: 5px; overflow: hidden; }
+  .sbar-fill { height: 100%; border-radius: 3px; }
+  .sbar-val { width: 32px; text-align: right; font-weight: 600; }
+
+  /* Sections */
+  .section { margin-bottom: 32px; }
+  .section-title { font-size: 15px; font-weight: 700; padding-bottom: 8px;
+    border-bottom: 2px solid var(--border); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px; }
+  .section-title .tag { font-size: 11px; font-weight: 500; color: var(--muted);
+    background: var(--border); padding: 2px 8px; border-radius: 10px; }
+
+  /* Fix plan */
+  .fix-item { display: flex; gap: 12px; padding: 12px 16px; border-radius: var(--radius);
+    border: 1px solid; margin-bottom: 10px; }
+  .fix-item.error  { background: var(--fail-bg); border-color: #fca5a5; }
+  .fix-item.warning { background: var(--warn-bg); border-color: #fcd34d; }
+  .fix-item.info   { background: var(--info-bg); border-color: #93c5fd; }
+  .fix-icon { font-size: 18px; flex-shrink: 0; }
+  .fix-body { flex: 1; min-width: 0; }
+  .fix-cat { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .fix-action { font-size: 14px; font-weight: 600; margin: 3px 0; }
+  .fix-details { font-size: 12px; color: var(--text); line-height: 1.7; }
+  .fix-details li { margin-left: 18px; }
+
+  /* Rules block */
+  .rules-block { background: #1e293b; border-radius: 6px; padding: 10px 14px; margin-top: 8px;
+    max-height: 200px; overflow-y: auto; }
+  .rule-line { font-family: monospace; font-size: 11.5px; color: #e2e8f0; line-height: 1.8;
+    border-bottom: 1px solid #334155; padding-bottom: 2px; }
+  .rule-line:last-child { border-bottom: none; }
+  .rule-preview { color: #a78bfa; font-size: 15px; }
+  .rules-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin-bottom: 4px; }
+
+  /* Feature comparison table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--surface); text-align: left; padding: 8px 12px; font-size: 11px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+    border-bottom: 2px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: #f1f5f9; }
+  .mono { font-family: monospace; font-weight: 700; font-size: 13px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .pill-pass { background: var(--pass-bg); color: var(--pass); }
+  .pill-fail { background: var(--fail-bg); color: var(--fail); }
+  .pill-warn { background: var(--warn-bg); color: var(--warn); }
+  .pill-a   { background: var(--a-bg); color: var(--a); }
+  .pill-b   { background: var(--b-bg); color: var(--b); }
+  .num-a { font-weight: 700; color: var(--a); }
+  .num-b { font-weight: 700; color: var(--b); }
+  .delta-pos { color: var(--pass); font-weight: 700; }
+  .delta-neg { color: var(--fail); font-weight: 700; }
+  .req-tag  { font-size: 9px; background: #fef9c3; color: #92400e; padding: 1px 5px; border-radius: 8px; font-weight: 700; vertical-align: middle; margin-left: 4px; }
+  tr.missing-a { background: #fff7ed; }
+
+  /* Coverage cells */
+  .glyph-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+  .gc { width: 48px; height: 48px; border: 1px solid var(--border); border-radius: 6px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 9px; color: var(--muted); cursor: default; position: relative; }
+  .gc:hover { z-index: 5; transform: scale(1.5); }
+  .gc.b-has { background: #f3e8ff; border-color: #c4b5fd; }
+  .gc-char { font-size: 18px; line-height: 1.1; }
+  .gc-cp   { font-size: 8px; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px; text-align: center; }
+  .stat-num { font-size: 24px; font-weight: 700; }
+  .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px;
+    border-top: 1px solid var(--border); margin-top: 40px; }
+  code { font-family: monospace; background: var(--surface); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .cat-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .06em; margin: 12px 0 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">ಕನ್ನಡ Font Quality Inspector — Cross-Font Comparison</div>
+  <div class="sub">Sanchaya Font Tools · typetest.sanchaya.net · ${formatDate(meta.timestamp)}</div>
+</header>
+
+<div class="container">
+
+  <!-- ── Hero ── -->
+  <div class="hero">
+    <div class="font-card card-a">
+      <div class="font-label label-a">Font A — to fix</div>
+      <div class="font-name">${esc(nameA)}</div>
+      <div class="font-file">${esc(rA.meta.fontFile)}</div>
+      <div class="score-row">
+        <div class="score-circle" style="border-color:${gradeColorA};color:${gradeColorA}">
+          <div class="score-num" style="color:${gradeColorA}">${rA.score.total}</div>
+          <div class="score-grade" style="color:${gradeColorA}">Grade ${rA.score.grade}</div>
+        </div>
+        <div class="score-bars">
+          ${compScoreBar('Coverage', rA.score.breakdown.coverage, 40, gradeColorA)}
+          ${compScoreBar('OT Features', rA.score.breakdown.features, 30, gradeColorA)}
+          ${compScoreBar('Script Tables', rA.score.breakdown.scripts, 10, gradeColorA)}
+          ${compScoreBar('Metadata', rA.score.breakdown.metadata, 10, gradeColorA)}
+          ${compScoreBar('Revival', rA.score.breakdown.revival, 10, gradeColorA)}
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-vs">vs</div>
+
+    <div class="font-card card-b">
+      <div class="font-label label-b">Font B — reference</div>
+      <div class="font-name">${esc(nameB)}</div>
+      <div class="font-file">${esc(rB.meta.fontFile)}</div>
+      <div class="score-row">
+        <div class="score-circle" style="border-color:${gradeColorB};color:${gradeColorB}">
+          <div class="score-num" style="color:${gradeColorB}">${rB.score.total}</div>
+          <div class="score-grade" style="color:${gradeColorB}">Grade ${rB.score.grade}</div>
+        </div>
+        <div class="score-bars">
+          ${compScoreBar('Coverage', rB.score.breakdown.coverage, 40, gradeColorB)}
+          ${compScoreBar('OT Features', rB.score.breakdown.features, 30, gradeColorB)}
+          ${compScoreBar('Script Tables', rB.score.breakdown.scripts, 10, gradeColorB)}
+          ${compScoreBar('Metadata', rB.score.breakdown.metadata, 10, gradeColorB)}
+          ${compScoreBar('Revival', rB.score.breakdown.revival, 10, gradeColorB)}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fix Plan ── -->
+  <div class="section">
+    <div class="section-title">
+      🔧 Fix Plan for Font A
+      <span class="tag">${diff.fixPlan.length} action(s)</span>
+      <span class="tag" style="color:${diff.scoreDelta >= 0 ? 'var(--pass)' : 'var(--fail)'}">
+        Score gap: ${diff.scoreDelta >= 0 ? '+' : ''}${diff.scoreDelta} pts
+      </span>
+    </div>
+    ${diff.fixPlan.length === 0
+      ? `<div class="pill pill-pass">✓ Font A is comparable to Font B — no major gaps found</div>`
+      : diff.fixPlan.map(item => `
+        <div class="fix-item ${sevClass(item.severity)}">
+          <div class="fix-icon">${sevIcon(item.severity)}</div>
+          <div class="fix-body">
+            <div class="fix-cat">${esc(item.category)}</div>
+            <div class="fix-action">${esc(item.action)}</div>
+            ${item.details && item.details.length > 0 ? `<ul class="fix-details">${item.details.map(d => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}
+            ${item.hasSampleRules && diff.sampleRules[item.tag] ? renderRulesBlock(diff.sampleRules[item.tag], nameB) : ''}
+          </div>
+        </div>`).join('')}
+  </div>
+
+  <!-- ── GSUB Feature Comparison ── -->
+  <div class="section">
+    <div class="section-title">GSUB Feature Comparison
+      <span class="tag">${Object.keys(diff.gsub.shared || {}).length} shared · ${(diff.gsub.onlyInB || []).length} only in B · ${(diff.gsub.onlyInA || []).length} only in A</span>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Feature</th><th>Description</th>
+        <th>Rules (A)</th><th>Rules (B)</th><th>Δ</th><th>Status</th>
+      </tr></thead>
+      <tbody>
+        ${allGsubTags.map(tag => {
+          const inA = diff.gsub.onlyInA.includes(tag) || diff.gsub.shared[tag] != null;
+          const inB = diff.gsub.onlyInB.includes(tag) || diff.gsub.shared[tag] != null;
+          const shared = diff.gsub.shared[tag];
+          const isReq = requiredTags.has(tag);
+          const fdesc = featureDesc[tag];
+          const rulesA = shared ? shared.rulesA : (inA ? '✓' : '—');
+          const rulesB = shared ? shared.rulesB : (inB ? '✓' : '—');
+          const delta  = shared ? shared.delta : null;
+          const status = !inA && inB ? `<span class="pill pill-fail">Missing in A</span>`
+            : inA && !inB ? `<span class="pill pill-a">Only in A</span>`
+            : delta != null && Math.abs(delta) >= 3 ? (delta > 0
+              ? `<span class="pill pill-warn">B richer +${delta}</span>`
+              : `<span class="pill pill-a">A richer +${-delta}</span>`)
+            : `<span class="pill pill-pass">Equal</span>`;
+          const rowClass = !inA && inB ? 'missing-a' : '';
+          return `<tr class="${rowClass}">
+            <td><span class="mono">${esc(tag)}</span>${isReq ? '<span class="req-tag">required</span>' : ''}</td>
+            <td style="font-size:12px;color:var(--muted)">${esc(fdesc?.name || '')}<br><span style="font-size:11px">${esc(fdesc?.desc || '')}</span></td>
+            <td class="num-a">${typeof rulesA === 'number' ? rulesA : `<span style="color:var(--muted)">${rulesA}</span>`}</td>
+            <td class="num-b">${typeof rulesB === 'number' ? rulesB : `<span style="color:var(--muted)">${rulesB}</span>`}</td>
+            <td>${delta != null ? `<span class="${delta > 0 ? 'delta-pos' : delta < 0 ? 'delta-neg' : ''}">${delta > 0 ? '+' : ''}${delta}</span>` : '—'}</td>
+            <td>${status}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+
+    ${diff.sampleRules && Object.keys(diff.sampleRules).length > 0 ? `
+    <div style="margin-top:24px">
+      <div class="cat-label">Sample Rules from Font B (blueprints for adding to Font A)</div>
+      ${Object.entries(diff.sampleRules).map(([tag, rules]) => {
+        if (!rules || rules.length === 0) return '';
+        const fdesc = featureDesc[tag];
+        return `<div style="margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px">
+            <span class="mono">${esc(tag)}</span>
+            <span style="color:var(--muted);font-weight:400;font-size:12px"> — ${esc(fdesc?.name || '')}</span>
+          </div>
+          ${renderRulesBlock(rules, nameB)}
+        </div>`;
+      }).join('')}
+    </div>` : ''}
+  </div>
+
+  <!-- ── GPOS Feature Comparison ── -->
+  <div class="section">
+    <div class="section-title">GPOS Feature Comparison</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${[...new Set([
+          ...(diff.gpos.onlyInA||[]),
+          ...(diff.gpos.onlyInB||[]),
+          ...(rA.gpos.featureRecords||[]).map(f=>f.tag),
+          ...(rB.gpos.featureRecords||[]).map(f=>f.tag),
+        ])].sort().map(tag => {
+          const inA = (rA.gpos.featureRecords||[]).some(f => f.tag === tag);
+          const inB = (rB.gpos.featureRecords||[]).some(f => f.tag === tag);
+          const cls = !inA && inB ? 'pill-fail' : inA && !inB ? 'pill-a' : 'pill-pass';
+          const lbl = !inA && inB ? `✗ ${tag} (only in B)` : inA && !inB ? `${tag} (only in A)` : `✓ ${tag}`;
+          return `<span class="pill ${cls}">${esc(lbl)}</span>`;
+        }).join('')}
+    </div>
+  </div>
+
+  <!-- ── Unicode Coverage diff ── -->
+  <div class="section">
+    <div class="section-title">Unicode Coverage Difference
+      <span class="tag">${diff.coverage.inBoth} in both · ${(diff.coverage.onlyInB||[]).length} only in B · ${(diff.coverage.onlyInA||[]).length} only in A</span>
+    </div>
+    ${(diff.coverage.onlyInB||[]).length > 0 ? `
+    <div class="cat-label" style="color:var(--b)">Glyphs in Font B but missing from Font A</div>
+    <div class="glyph-grid" style="margin-bottom:16px">
+      ${(diff.coverage.onlyInB||[]).map(r => `
+        <div class="gc b-has" title="${esc(r.name)} ${r.cpHex}${r.required?' (required)':''}${r.revival?' (revival)':''}">
+          <div class="gc-char">${r.char}</div>
+          <div class="gc-cp">${r.cpHex}</div>
+        </div>`).join('')}
+    </div>` : ''}
+    ${(diff.coverage.onlyInA||[]).length > 0 ? `
+    <div class="cat-label" style="color:var(--a)">Glyphs in Font A but not in Font B</div>
+    <div class="glyph-grid">
+      ${(diff.coverage.onlyInA||[]).map(r => `
+        <div class="gc" style="background:var(--a-bg);border-color:#bfdbfe" title="${esc(r.name)} ${r.cpHex}">
+          <div class="gc-char">${r.char}</div>
+          <div class="gc-cp">${r.cpHex}</div>
+        </div>`).join('')}
+    </div>` : ''}
+  </div>
+
+  <!-- ── Individual Font Summaries ── -->
+  <div class="section">
+    <div class="section-title">Individual Issue Summaries</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      ${renderIssueSummary(rA, nameA, 'A', 'var(--a)')}
+      ${renderIssueSummary(rB, nameB, 'B', 'var(--b)')}
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Cross-Font Comparison · Kannada Font Quality Inspector v${esc(meta.version)} ·
+  <a href="https://typetest.sanchaya.net" style="color:var(--muted)">typetest.sanchaya.net</a>
+</footer>
+</body>
+</html>`;
+}
+
+// ─── Reporter helpers ─────────────────────────────────────────────────────────
+
+function gradeColor(grade) {
+  return { A: '#16a34a', B: '#2563eb', C: '#d97706', D: '#ea580c', F: '#dc2626' }[grade] || '#64748b';
+}
+
+function compScoreBar(label, val, max, color) {
+  const pct = Math.round((val / max) * 100);
+  return `<div class="sbar">
+    <span class="sbar-lbl">${label}</span>
+    <div class="sbar-track"><div class="sbar-fill" style="width:${pct}%;background:${color}"></div></div>
+    <span class="sbar-val">${val}/${max}</span>
+  </div>`;
+}
+
+function renderRulesBlock(rules, sourceName) {
+  if (!rules || rules.length === 0) return '';
+  return `<div style="margin-top:6px">
+    <div class="rules-label">Sample rules from ${esc(sourceName || 'Font B')}</div>
+    <div class="rules-block">
+      ${rules.map(r => `<div class="rule-line">
+        ${r.preview ? `<span class="rule-preview">${esc(r.preview)}</span> &nbsp; ` : ''}
+        <span style="color:#94a3b8;font-size:10px">${esc(r.display)}</span>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function renderIssueSummary(report, name, label, color) {
+  const errors  = report.issues.filter(i => i.severity === 'error');
+  const warns   = report.issues.filter(i => i.severity === 'warning');
+  return `<div style="border:1px solid var(--border);border-left:4px solid ${color};border-radius:var(--radius);padding:14px">
+    <div style="font-weight:700;margin-bottom:8px">Font ${label}: ${esc(name)}</div>
+    ${errors.length === 0 && warns.length === 0
+      ? `<div class="pill pill-pass">✓ No critical issues</div>`
+      : [...errors.slice(0,5), ...warns.slice(0,3)].map(i => `
+          <div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)">
+            <span>${i.severity === 'error' ? '⛔' : '⚠️'}</span>
+            ${esc(i.message)}
+          </div>`).join('')}
+    ${errors.length > 5 ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">…and ${errors.length - 5} more errors</div>` : ''}
+  </div>`;
+}
+
+module.exports = { renderHtmlReport, renderComparisonReport };

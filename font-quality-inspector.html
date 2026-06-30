@@ -165,6 +165,30 @@ code{font-family:monospace;background:var(--surface);border:1px solid var(--bord
   th,td{padding:5px 7px}
   .feat-grid{grid-template-columns:1fr}
 }
+
+/* ── Cross-Font Comparison ── */
+:root {
+  --a:#2563eb; --b:#9333ea;
+  --a-bg:#dbeafe; --b-bg:#f3e8ff;
+}
+.cmp-hero{display:grid;grid-template-columns:1fr 48px 1fr;gap:0;align-items:stretch;margin-bottom:20px}
+.cmp-card{border:1px solid var(--border);border-radius:8px;padding:16px;background:var(--surface)}
+.cmp-card-a{border-left:4px solid var(--a)}
+.cmp-card-b{border-left:4px solid var(--b)}
+.cmp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+  padding:2px 8px;border-radius:10px;display:inline-block;margin-bottom:6px}
+.cmp-label-a{background:var(--a-bg);color:var(--a)}
+.cmp-label-b{background:var(--b-bg);color:var(--b)}
+.cmp-vs{display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted);font-size:18px}
+.cmp-circle{width:60px;height:60px;border-radius:50%;border:4px solid;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.cmp-row{display:flex;align-items:center;gap:12px;margin-top:10px}
+.rules-block{background:#1e293b;border-radius:6px;padding:8px 12px;margin-top:6px;max-height:180px;overflow-y:auto}
+.rule-line{font-family:monospace;font-size:11.5px;color:#e2e8f0;border-bottom:1px solid #334155;padding:2px 0}
+.rule-line:last-child{border-bottom:none}
+.rule-preview{color:#a78bfa;font-size:14px}
+.req-badge{font-size:9px;background:#fef9c3;color:#92400e;padding:1px 5px;border-radius:8px;font-weight:700;margin-left:4px;vertical-align:middle}
+#panel-compare .issue-item{margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -180,9 +204,10 @@ code{font-family:monospace;background:var(--surface);border:1px solid var(--bord
     </div>
   </div>
   <div class="hdr-right">
-    <button class="btn btn-ghost" id="btn-export-json" style="display:none" onclick="exportJSON()">⬇ Export JSON</button>
-    <button class="btn btn-ghost" id="btn-compare"     style="display:none" onclick="triggerCompare()">↔ Compare</button>
-    <button class="btn btn-ghost" id="btn-reset"       style="display:none" onclick="resetTool()">✕ Reset</button>
+    <button class="btn btn-ghost" id="btn-export-json"   style="display:none" onclick="exportJSON()">⬇ Export JSON</button>
+    <button class="btn btn-ghost" id="btn-compare-font"  style="display:none" onclick="triggerCompareFont()" title="Compare internals with a second font">🔬 Compare Font</button>
+    <button class="btn btn-ghost" id="btn-compare"       style="display:none" onclick="triggerVersionDiff()" title="Diff against a saved JSON report">↔ Version Diff</button>
+    <button class="btn btn-ghost" id="btn-reset"         style="display:none" onclick="resetTool()">✕ Reset</button>
     <a class="btn btn-ghost" href="https://fonts.sanchaya.net" target="_blank">fonts.sanchaya.net ↗</a>
   </div>
 </header>
@@ -207,8 +232,9 @@ code{font-family:monospace;background:var(--surface);border:1px solid var(--bord
   </div>
 </div>
 
-<input type="file" id="file-input" accept=".ttf,.otf,.woff,.woff2" style="display:none">
-<input type="file" id="compare-input" accept=".json" style="display:none">
+<input type="file" id="file-input"         accept=".ttf,.otf,.woff,.woff2" style="display:none">
+<input type="file" id="compare-input"     accept=".json"                     style="display:none">
+<input type="file" id="compare-font-input" accept=".ttf,.otf,.woff,.woff2"  style="display:none">
 
 <!-- ── Loading overlay ──────────────────────────────────────────────── -->
 <div id="loading">
@@ -246,6 +272,7 @@ code{font-family:monospace;background:var(--surface);border:1px solid var(--bord
     <div class="tab" data-tab="glyphs">Glyph Inventory</div>
     <div class="tab" data-tab="metadata">Metadata</div>
     <div class="tab" data-tab="issues">Issues <span class="tab-count" id="issue-count">0</span></div>
+    <div class="tab" data-tab="compare" id="tab-compare" style="display:none">🔬 Compare <span class="tab-count" id="compare-badge" style="background:#f3e8ff;color:#9333ea">vs B</span></div>
   </div>
 
   <!-- ─ OVERVIEW ── -->
@@ -365,6 +392,17 @@ code{font-family:monospace;background:var(--surface);border:1px solid var(--bord
       <div class="section-title">Issues &amp; Recommendations</div>
       <div id="issue-list-wrap"></div>
     </div>
+  </div>
+
+  <!-- ─ COMPARE ── -->
+  <div class="tab-panel" id="panel-compare">
+    <div id="compare-loading" style="text-align:center;padding:60px 24px">
+      <div style="font-size:36px;margin-bottom:12px">🔬</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px">Cross-Font Internals Comparison</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:20px">Load a second font to compare GSUB rules, coverage, and get a fix plan for this font</div>
+      <button class="btn btn-primary" onclick="triggerCompareFont()">Load Reference Font (Font B)</button>
+    </div>
+    <div id="compare-content" style="display:none"></div>
   </div>
 
 </div><!-- /main -->
@@ -506,10 +544,13 @@ const CONJUNCTS=[
 // STATE
 // ════════════════════════════════════════════════════════════════════════════
 
-let currentReport  = null;
-let currentFont    = null;
-let allGlyphs      = [];
-let glyphPage      = 0;
+let currentReport     = null;
+let currentFont       = null;
+let currentReportB    = null;
+let currentFontB      = null;
+let currentComparison = null;
+let allGlyphs         = [];
+let glyphPage         = 0;
 const PAGE_SIZE    = 100;
 const GRADE_COLORS = {A:'#16a34a',B:'#2563eb',C:'#d97706',D:'#ea580c',F:'#dc2626'};
 
@@ -531,6 +572,10 @@ document.getElementById('compare-input').addEventListener('change', e => {
     } catch(err) { alert('Could not parse JSON report: ' + err.message); }
   };
   reader.readAsText(e.target.files[0]);
+});
+
+document.getElementById('compare-font-input').addEventListener('change', e => {
+  if (e.target.files[0]) loadCompareFontFile(e.target.files[0]);
 });
 
 const dropTarget = document.getElementById('drop-target');
@@ -869,7 +914,7 @@ function compareReports(oldR, newR) {
 function renderReport(report) {
   document.getElementById('drop-zone').style.display = 'none';
   document.getElementById('main').style.display      = 'block';
-  ['btn-export-json','btn-compare','btn-reset'].forEach(id=>document.getElementById(id).style.display='');
+  ['btn-export-json','btn-compare-font','btn-compare','btn-reset'].forEach(id=>document.getElementById(id).style.display='');
 
   const {score,issues,metadata,coverage,scripts,features,gsub,gpos,glyphs,meta} = report;
   const gc = GRADE_COLORS[score.grade]||'#64748b';
@@ -1274,19 +1319,484 @@ function exportJSON() {
   a.click();
 }
 
-function triggerCompare() {
+function triggerVersionDiff() {
   document.getElementById('compare-input').click();
 }
 
+function triggerCompareFont() {
+  document.getElementById('compare-font-input').click();
+}
+
 function resetTool() {
-  currentReport = null; currentFont = null; allGlyphs = [];
+  currentReport = null; currentFont = null;
+  currentReportB = null; currentFontB = null; currentComparison = null;
+  allGlyphs = [];
   document.getElementById('main').style.display = 'none';
   document.getElementById('drop-zone').style.display = 'flex';
   document.getElementById('diff-section').style.display = 'none';
-  ['btn-export-json','btn-compare','btn-reset'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('tab-compare').style.display = 'none';
+  document.getElementById('compare-loading').style.display = 'block';
+  document.getElementById('compare-content').style.display = 'none';
+  ['btn-export-json','btn-compare-font','btn-compare','btn-reset'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('file-input').value='';
   document.getElementById('compare-input').value='';
+  document.getElementById('compare-font-input').value='';
   renderHistory();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FONT B LOADING & CROSS-FONT COMPARISON ENGINE
+// ════════════════════════════════════════════════════════════════════════════
+
+function loadCompareFontFile(file) {
+  document.getElementById('loading').style.display = 'flex';
+  document.querySelector('#loading div:last-child').textContent = 'Loading Font B…';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const buf   = ev.target.result;
+      const font  = opentype.parse(buf);
+      currentFontB = font;
+
+      // Register Font B as a separate CSS font face
+      const blob  = new Blob([buf], { type: 'font/truetype' });
+      const url   = URL.createObjectURL(blob);
+      const style = document.getElementById('loaded-fontb-style') || document.createElement('style');
+      style.id = 'loaded-fontb-style';
+      style.textContent = `@font-face { font-family: 'LoadedFontB'; src: url('${url}'); }`;
+      document.head.appendChild(style);
+
+      currentReportB = buildReport(font, file.name);
+      currentComparison = crossCompare(currentFont, currentReport, currentFontB, currentReportB);
+      renderComparePanel(currentComparison);
+
+      // Show & activate Compare tab
+      const tabEl = document.getElementById('tab-compare');
+      tabEl.style.display = '';
+      tabEl.click();
+    } catch(err) {
+      alert('Error loading Font B: ' + err.message);
+    } finally {
+      document.getElementById('loading').style.display = 'none';
+      document.querySelector('#loading div:last-child').textContent = 'Analyzing font…';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── GSUB rule extraction ──────────────────────────────────────────────────
+
+function buildGlyphCharMap(font) {
+  const map = {};
+  for (let i = 0; i < font.glyphs.length; i++) {
+    const g = font.glyphs.get(i);
+    if (!g) continue;
+    const uc = g.unicode != null ? g.unicode
+      : (g.unicodes && g.unicodes.length > 0 ? g.unicodes[0] : null);
+    if (uc != null) map[i] = uc;
+  }
+  return map;
+}
+
+function descGlyph(glyphId, font, gcm) {
+  const cp   = gcm[glyphId];
+  const g    = font.glyphs.get(glyphId);
+  const name = (g && g.name) ? g.name : `g${glyphId}`;
+  if (cp != null) {
+    const ch = String.fromCodePoint(cp);
+    return `${ch}(${name} U+${cp.toString(16).toUpperCase().padStart(4,'0')})`;
+  }
+  return name;
+}
+
+function extractGSUBRulesForFeature(font, featureTag, limit=30) {
+  const gsub = font.tables.gsub;
+  if (!gsub) return [];
+
+  const gcm = buildGlyphCharMap(font);
+  const features = gsub.features || gsub.featureList?.featureRecords || [];
+  const lookupIdxs = new Set();
+  for (const feat of features) {
+    const tag = feat.tag || feat.featureTag;
+    if (tag !== featureTag) continue;
+    const idxs = feat.feature?.lookupListIndexes || feat.feature?.lookupListIndices || [];
+    for (const idx of idxs) lookupIdxs.add(idx);
+  }
+  if (lookupIdxs.size === 0) return [];
+
+  const allLookups = gsub.lookups || gsub.lookupList?.lookups || [];
+  const rules = [];
+
+  for (const li of [...lookupIdxs].sort((a,b)=>a-b)) {
+    if (rules.length >= limit) break;
+    const lookup = allLookups[li];
+    if (!lookup) continue;
+    const ltype = lookup.lookupType;
+
+    for (const sub of (lookup.subtables||[])) {
+      if (rules.length >= limit) break;
+      const covGlyphs = sub.coverage?.glyphs || [];
+
+      if (ltype === 1) {
+        if (sub.substFormat === 2 && Array.isArray(sub.substitute)) {
+          for (let i=0; i<covGlyphs.length && rules.length<limit; i++) {
+            const src=covGlyphs[i], dst=sub.substitute[i];
+            if (dst==null) continue;
+            const srcCp=gcm[src], dstCp=gcm[dst];
+            rules.push({ type:'single', lookupIndex:li,
+              preview: srcCp!=null&&dstCp!=null ? `${String.fromCodePoint(srcCp)} → ${String.fromCodePoint(dstCp)}` : null,
+              display: `${descGlyph(src,font,gcm)} → ${descGlyph(dst,font,gcm)}` });
+          }
+        } else if (sub.substFormat === 1 && sub.deltaGlyphId != null) {
+          for (let i=0; i<covGlyphs.length && rules.length<limit; i++) {
+            const src=covGlyphs[i], dst=src+sub.deltaGlyphId;
+            const srcCp=gcm[src], dstCp=gcm[dst];
+            rules.push({ type:'single-delta', lookupIndex:li,
+              preview: srcCp!=null&&dstCp!=null ? `${String.fromCodePoint(srcCp)} → ${String.fromCodePoint(dstCp)}` : null,
+              display: `${descGlyph(src,font,gcm)} → ${descGlyph(dst,font,gcm)} [Δ${sub.deltaGlyphId}]` });
+          }
+        }
+      } else if (ltype === 4) {
+        const ligSets = sub.ligatureSets || [];
+        for (let i=0; i<covGlyphs.length && rules.length<limit; i++) {
+          const first = covGlyphs[i];
+          const ligSet = ligSets[i] || [];
+          for (const lig of ligSet) {
+            if (rules.length >= limit) break;
+            const inputGlyphs = [first, ...(lig.components||[])];
+            const inputCps = inputGlyphs.map(g=>gcm[g]);
+            const outCp = gcm[lig.ligGlyph];
+            const allCps = inputCps.every(c=>c!=null);
+            rules.push({ type:'ligature', lookupIndex:li,
+              preview: allCps&&outCp!=null
+                ? inputCps.map(c=>String.fromCodePoint(c)).join(' + ')+' → '+String.fromCodePoint(outCp)
+                : null,
+              display: inputGlyphs.map(g=>descGlyph(g,font,gcm)).join(' + ')+' → '+descGlyph(lig.ligGlyph,font,gcm) });
+          }
+        }
+      }
+    }
+  }
+  return rules;
+}
+
+// ── Cross-font comparison logic ───────────────────────────────────────────
+
+function crossCompare(fontA, reportA, fontB, reportB) {
+  // Coverage diff
+  const presentA = new Set(reportA.coverage.all.filter(r=>r.has).map(r=>r.cpHex));
+  const presentB = new Set(reportB.coverage.all.filter(r=>r.has).map(r=>r.cpHex));
+  const covOnlyB = reportB.coverage.all.filter(r=>r.has && !presentA.has(r.cpHex));
+  const covOnlyA = reportA.coverage.all.filter(r=>r.has && !presentB.has(r.cpHex));
+
+  // GSUB diff (f2l = feature→lookup index map)
+  const gsubFeatsA = new Set(Object.keys(reportA.gsub.f2l||{}));
+  const gsubFeatsB = new Set(Object.keys(reportB.gsub.f2l||{}));
+  const gsubOnlyB  = [...gsubFeatsB].filter(t=>!gsubFeatsA.has(t));
+  const gsubOnlyA  = [...gsubFeatsA].filter(t=>!gsubFeatsB.has(t));
+  const gsubShared = {};
+  for (const tag of gsubFeatsA) {
+    if (!gsubFeatsB.has(tag)) continue;
+    const idxA = reportA.gsub.f2l[tag]||[];
+    const idxB = reportB.gsub.f2l[tag]||[];
+    const rulesA = idxA.reduce((s,i)=>s+(reportA.gsub.lookups[i]?.ruleCount||0), 0);
+    const rulesB = idxB.reduce((s,i)=>s+(reportB.gsub.lookups[i]?.ruleCount||0), 0);
+    gsubShared[tag] = { rulesA, rulesB, delta: rulesB - rulesA };
+  }
+
+  // Extract sample rules from Font B as blueprints
+  const reqTags = new Set(OT_FEATURES.filter(f=>f.req).map(f=>f.tag));
+  const sampleRules = {};
+  for (const tag of gsubOnlyB) {
+    if (reqTags.has(tag) || gsubOnlyB.length <= 8)
+      sampleRules[tag] = extractGSUBRulesForFeature(fontB, tag, 12);
+  }
+  for (const [tag, info] of Object.entries(gsubShared)) {
+    if (info.rulesB > info.rulesA * 1.3 && info.delta >= 3)
+      sampleRules[tag] = extractGSUBRulesForFeature(fontB, tag, 8);
+  }
+
+  // GPOS diff
+  const gposFeatsA = new Set((reportA.gpos.featRecords||[]).map(f=>f.tag));
+  const gposFeatsB = new Set((reportB.gpos.featRecords||[]).map(f=>f.tag));
+  const gposOnlyB  = [...gposFeatsB].filter(t=>!gposFeatsA.has(t));
+  const gposOnlyA  = [...gposFeatsA].filter(t=>!gposFeatsB.has(t));
+
+  // Build fix plan
+  const fixPlan = buildFixPlan({ reportA, reportB, gsubOnlyB, gposOnlyB, gsubShared, covOnlyB, sampleRules, reqTags });
+
+  return {
+    scoreA: reportA.score, scoreB: reportB.score,
+    nameA: reportA.meta.fontFile, nameB: reportB.meta.fontFile,
+    diff: {
+      scoreDelta: reportB.score.total - reportA.score.total,
+      coverage: { onlyInA:covOnlyA, onlyInB:covOnlyB, inBoth:[...presentA].filter(cp=>presentB.has(cp)).length },
+      gsub: { onlyInA:gsubOnlyA, onlyInB:gsubOnlyB, shared:gsubShared },
+      gpos: { onlyInA:gposOnlyA, onlyInB:gposOnlyB },
+      sampleRules, fixPlan,
+    },
+  };
+}
+
+function buildFixPlan({ reportA, reportB, gsubOnlyB, gposOnlyB, gsubShared, covOnlyB, sampleRules, reqTags }) {
+  const plan = [];
+
+  const critGlyphs = covOnlyB.filter(r=>r.req);
+  if (critGlyphs.length > 0) plan.push({
+    sev:'critical', cat:'Unicode Coverage',
+    action:`Add ${critGlyphs.length} missing required glyph(s)`,
+    details: critGlyphs.map(r=>`${r.ch} ${r.cpHex} – ${r.n}`),
+  });
+  const revGlyphs = covOnlyB.filter(r=>r.rev&&!r.req);
+  if (revGlyphs.length > 0) plan.push({
+    sev:'info', cat:'Unicode Coverage',
+    action:`Add ${revGlyphs.length} revival/archaic glyph(s) Font B supports`,
+    details: revGlyphs.map(r=>`${r.ch} ${r.cpHex} – ${r.n}`),
+  });
+
+  for (const tag of gsubOnlyB.filter(t=>reqTags.has(t))) {
+    const rules = sampleRules[tag]||[];
+    plan.push({ sev:'critical', cat:'GSUB Feature', tag,
+      action:`Add required GSUB feature "${tag}"`,
+      details: rules.length>0 ? ['Sample rules from Font B:'] : [],
+      rules,
+    });
+  }
+  const optOnly = gsubOnlyB.filter(t=>!reqTags.has(t));
+  if (optOnly.length > 0) plan.push({
+    sev:'warning', cat:'GSUB Feature',
+    action:`Add optional GSUB features present in Font B: ${optOnly.join(', ')}`,
+    details:[], rules:[],
+  });
+
+  const underserved = Object.entries(gsubShared)
+    .filter(([,i])=>i.delta>=5&&i.rulesB>i.rulesA*1.2)
+    .sort(([,a],[,b])=>b.delta-a.delta).slice(0,5);
+  for (const [tag, info] of underserved) {
+    plan.push({ sev: reqTags.has(tag)?'warning':'info', cat:'GSUB Rule Count', tag,
+      action:`Expand "${tag}": A has ${info.rulesA} rules, B has ${info.rulesB} (+${info.delta} more)`,
+      details:[], rules: sampleRules[tag]||[],
+    });
+  }
+
+  for (const tag of gposOnlyB.filter(t=>['mark','mkmk','abvm','blwm'].includes(t))) {
+    plan.push({ sev:'critical', cat:'GPOS Feature',
+      action:`Add GPOS feature "${tag}" — ${
+        tag==='mark'?'Mark-to-Base: vowel signs won\'t attach correctly'
+        :tag==='mkmk'?'Mark-to-Mark: stacking diacritics mispositioned'
+        :tag}`,
+      details:[], rules:[],
+    });
+  }
+  return plan;
+}
+
+// ── Compare tab rendering ─────────────────────────────────────────────────
+
+function renderComparePanel(cmp) {
+  const { diff, scoreA, scoreB, nameA, nameB } = cmp;
+  const gcA = GRADE_COLORS[scoreA.grade]||'#64748b';
+  const gcB = GRADE_COLORS[scoreB.grade]||'#64748b';
+  const delta = diff.scoreDelta;
+  const reqTags = new Set(OT_FEATURES.filter(f=>f.req).map(f=>f.tag));
+  const featDesc = Object.fromEntries(OT_FEATURES.map(f=>[f.tag,f]));
+  const sevIcon  = s => ({critical:'⛔',warning:'⚠️',info:'ℹ️'}[s]||'•');
+  const sevClass = s => ({critical:'error',warning:'warning',info:'info'}[s]||'info');
+
+  const allGsubTags = [...new Set([
+    ...Object.keys(diff.gsub.shared||{}),
+    ...(diff.gsub.onlyInA||[]),
+    ...(diff.gsub.onlyInB||[]),
+    ...OT_FEATURES.filter(f=>f.stage<3).map(f=>f.tag),
+  ])].sort();
+
+  const allGposTags = [...new Set([
+    ...(diff.gpos.onlyInA||[]),
+    ...(diff.gpos.onlyInB||[]),
+    ...(currentReport.gpos.featRecords||[]).map(f=>f.tag),
+    ...(currentReportB.gpos.featRecords||[]).map(f=>f.tag),
+  ])].sort();
+
+  const html = `
+  <div class="cmp-hero">
+    <div class="cmp-card cmp-card-a">
+      <div class="cmp-label cmp-label-a">Font A — to fix</div>
+      <div style="font-size:15px;font-weight:800;margin-bottom:2px">${esc(nameA)}</div>
+      <div class="cmp-row">
+        <div class="cmp-circle" style="border-color:${gcA}">
+          <div style="font-size:20px;font-weight:800;color:${gcA};line-height:1">${scoreA.total}</div>
+          <div style="font-size:10px;font-weight:700;color:${gcA}">Grade ${scoreA.grade}</div>
+        </div>
+        <div style="flex:1">${cmpScoreBars(scoreA.breakdown, gcA)}</div>
+      </div>
+    </div>
+    <div class="cmp-vs">vs</div>
+    <div class="cmp-card cmp-card-b">
+      <div class="cmp-label cmp-label-b">Font B — reference</div>
+      <div style="font-size:15px;font-weight:800;margin-bottom:2px">${esc(nameB)}</div>
+      <div class="cmp-row">
+        <div class="cmp-circle" style="border-color:${gcB}">
+          <div style="font-size:20px;font-weight:800;color:${gcB};line-height:1">${scoreB.total}</div>
+          <div style="font-size:10px;font-weight:700;color:${gcB}">Grade ${scoreB.grade}</div>
+        </div>
+        <div style="flex:1">${cmpScoreBars(scoreB.breakdown, gcB)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:20px;font-size:13px">
+    Score gap: <strong style="color:${delta>=0?'#16a34a':'#dc2626'}">${delta>=0?'+':''}${delta} pts</strong>
+    ${delta===0?' — fonts are comparable quality':delta>0?' — Font B is stronger':` — Font A is actually stronger by ${-delta} pts`}
+  </div>
+
+  <div class="section">
+    <div class="section-title">🔧 Fix Plan for Font A <span class="tag">${diff.fixPlan.length} action(s)</span></div>
+    ${diff.fixPlan.length===0
+      ? '<span class="pill pill-pass">✓ Font A is comparable to Font B — no major gaps found</span>'
+      : diff.fixPlan.map(item=>`
+        <div class="issue-item ${sevClass(item.sev)}">
+          <span class="issue-icon">${sevIcon(item.sev)}</span>
+          <div style="flex:1">
+            <div class="issue-cat">${esc(item.cat)}</div>
+            <div class="issue-msg" style="font-weight:600">${esc(item.action)}</div>
+            ${item.details&&item.details.length?`<ul style="font-size:12px;margin:4px 0 0 16px">${item.details.map(d=>`<li>${esc(d)}</li>`).join('')}</ul>`:''}
+            ${item.rules&&item.rules.length?rulesBlock(item.rules):''}
+          </div>
+        </div>`).join('')}
+  </div>
+
+  <div class="section">
+    <div class="section-title">GSUB Feature Comparison
+      <span class="tag">${Object.keys(diff.gsub.shared||{}).length} shared</span>
+      ${(diff.gsub.onlyInB||[]).length?`<span class="tag" style="background:#fee2e2;color:#dc2626">${diff.gsub.onlyInB.length} only in B</span>`:''}
+    </div>
+    <table>
+      <thead><tr>
+        <th>Feature</th><th>Description</th>
+        <th style="color:var(--a)">Rules (A)</th>
+        <th style="color:var(--b)">Rules (B)</th>
+        <th>Δ</th><th>Status</th>
+      </tr></thead>
+      <tbody>
+        ${allGsubTags.map(tag=>{
+          const inA = (diff.gsub.onlyInA||[]).includes(tag) || diff.gsub.shared[tag]!=null;
+          const inB = (diff.gsub.onlyInB||[]).includes(tag) || diff.gsub.shared[tag]!=null;
+          const sh  = diff.gsub.shared[tag];
+          const rA  = sh?sh.rulesA:(inA?'✓':'—');
+          const rB  = sh?sh.rulesB:(inB?'✓':'—');
+          const dl  = sh?sh.delta:null;
+          const fd  = featDesc[tag];
+          const isReq = reqTags.has(tag);
+          const st = !inA&&inB
+            ? `<span class="pill pill-fail">Missing in A</span>`
+            : inA&&!inB
+              ? `<span class="pill" style="background:var(--a-bg);color:var(--a)">Only in A</span>`
+              : dl!=null&&Math.abs(dl)>=3
+                ? (dl>0?`<span class="pill pill-warn">B richer +${dl}</span>`:`<span class="pill" style="background:var(--a-bg);color:var(--a)">A richer</span>`)
+                : `<span class="pill pill-pass">Equal</span>`;
+          return `<tr style="${!inA&&inB?'background:#fff7ed':''}">
+            <td><code>${esc(tag)}</code>${isReq?`<span class="req-badge">req</span>`:''}</td>
+            <td style="font-size:12px;color:var(--muted)">${esc(fd?.n||'')}${fd?.desc?`<br><span style="font-size:11px">${esc(fd.desc)}</span>`:''}</td>
+            <td style="font-weight:700;color:var(--a)">${typeof rA==='number'?rA:`<span style="color:var(--muted)">${rA}</span>`}</td>
+            <td style="font-weight:700;color:var(--b)">${typeof rB==='number'?rB:`<span style="color:var(--muted)">${rB}</span>`}</td>
+            <td>${dl!=null?`<span style="font-weight:700;color:${dl>0?'#16a34a':dl<0?'#dc2626':'var(--muted)'}">${dl>0?'+':''}${dl}</span>`:'—'}</td>
+            <td>${st}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+
+    ${Object.keys(diff.sampleRules||{}).length>0?`
+    <div style="margin-top:20px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px">
+        Sample Rules from Font B — blueprints for adding to Font A
+      </div>
+      ${Object.entries(diff.sampleRules).map(([tag,rules])=>{
+        if(!rules||rules.length===0) return '';
+        const fd = featDesc[tag];
+        return `<div style="margin-bottom:14px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px">
+            <code>${esc(tag)}</code>
+            <span style="color:var(--muted);font-size:12px;font-weight:400"> — ${esc(fd?.n||'')}</span>
+          </div>
+          ${rulesBlock(rules)}
+        </div>`;
+      }).join('')}
+    </div>`:``}
+  </div>
+
+  <div class="section">
+    <div class="section-title">GPOS Feature Comparison</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${allGposTags.map(tag=>{
+        const inA = (currentReport.gpos.featRecords||[]).some(f=>f.tag===tag);
+        const inB = (currentReportB.gpos.featRecords||[]).some(f=>f.tag===tag);
+        const cls = !inA&&inB?'pill-fail':inA&&!inB?'':'pill-pass';
+        const sty = inA&&!inB?'background:var(--a-bg);color:var(--a)':'';
+        const lbl = !inA&&inB?`✗ ${tag} (only in B)`:inA&&!inB?`${tag} (only in A)`:`✓ ${tag}`;
+        return `<span class="pill ${cls}" style="${sty}">${esc(lbl)}</span>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Coverage Difference
+      <span class="tag">${diff.coverage.inBoth} in both</span>
+      ${(diff.coverage.onlyInB||[]).length?`<span class="tag" style="background:var(--b-bg);color:var(--b)">${diff.coverage.onlyInB.length} only in B</span>`:''}
+    </div>
+    ${(diff.coverage.onlyInB||[]).length>0?`
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--b);margin:8px 0 6px">
+        Glyphs in Font B missing from Font A
+      </div>
+      <div class="glyph-grid" style="margin-bottom:16px">
+        ${(diff.coverage.onlyInB||[]).map(r=>`
+          <div class="gc" style="background:var(--b-bg);border-color:#c4b5fd">
+            <div class="gc-ch" style="font-family:'LoadedFontB','Noto Sans Kannada',sans-serif">${r.ch}</div>
+            <div class="gc-cp">${r.cpHex}</div>
+            <div class="gc-tt">${esc(r.n)}${r.req?' (req)':r.rev?' (revival)':''}</div>
+          </div>`).join('')}
+      </div>`:``}
+    ${(diff.coverage.onlyInA||[]).length>0?`
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--a);margin:8px 0 6px">
+        Glyphs in Font A not in Font B
+      </div>
+      <div class="glyph-grid">
+        ${(diff.coverage.onlyInA||[]).map(r=>`
+          <div class="gc" style="background:var(--a-bg);border-color:#bfdbfe">
+            <div class="gc-ch" style="font-family:'LoadedFont','Noto Sans Kannada',sans-serif">${r.ch}</div>
+            <div class="gc-cp">${r.cpHex}</div>
+            <div class="gc-tt">${esc(r.n)}</div>
+          </div>`).join('')}
+      </div>`:``}
+  </div>`;
+
+  document.getElementById('compare-content').innerHTML = html;
+  document.getElementById('compare-loading').style.display  = 'none';
+  document.getElementById('compare-content').style.display  = 'block';
+}
+
+function cmpScoreBars(bd, color) {
+  return [['Cov.',bd.coverage,40],['Feats.',bd.features,30],['Scripts',bd.scripts,10],['Meta',bd.metadata,10],['Revival',bd.revival,10]]
+    .map(([l,v,m])=>{
+      const pct=Math.round((v/m)*100);
+      return `<div style="display:flex;align-items:center;gap:6px;font-size:10px;margin-bottom:3px">
+        <span style="width:44px;color:var(--muted)">${l}</span>
+        <div style="flex:1;background:var(--border);border-radius:3px;height:4px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${color}"></div>
+        </div>
+        <span style="width:28px;text-align:right;font-weight:600">${v}/${m}</span>
+      </div>`;
+    }).join('');
+}
+
+function rulesBlock(rules) {
+  if(!rules||rules.length===0) return '';
+  return `<div class="rules-block">
+    ${rules.map(r=>`<div class="rule-line">
+      ${r.preview?`<span class="rule-preview">${esc(r.preview)}</span> &nbsp; `:``}
+      <span style="color:#94a3b8;font-size:10px">${esc(r.display)}</span>
+    </div>`).join('')}
+  </div>`;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
