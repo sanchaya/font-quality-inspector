@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Font Quality Inspector — ಫಾಂಟ್ ಗುಣಮಟ್ಟ ತಪಾಸಣೆ</title>
+<link rel="icon" type="image/png" href="https://fonts.sanchaya.net/img/app-icon-light.png">
+<link rel="apple-touch-icon" href="https://fonts.sanchaya.net/img/app-icon-light.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
 <style>
 :root {
@@ -20,7 +22,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
 /* ── Header ── */
 .hdr{background:var(--header-bg);color:#fff;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:100}
 .hdr-left{display:flex;align-items:center;gap:14px}
-.hdr-logo{height:28px}
+.hdr-logo{height:26px;width:26px;object-fit:contain}
+.hdr-logo-wordmark{height:18px;object-fit:contain;opacity:.85}
+.hdr-logo-divider{width:1px;height:18px;background:rgba(255,255,255,.2)}
 .hdr-title{font-size:15px;font-weight:700;letter-spacing:.01em}
 .hdr-sub{font-size:11px;color:#94a3b8;margin-top:1px}
 .hdr-right{display:flex;align-items:center;gap:8px}
@@ -196,8 +200,9 @@ code{font-family:monospace;background:var(--surface);border:1px solid var(--bord
 <!-- ── Header ──────────────────────────────────────────────────────── -->
 <header class="hdr">
   <div class="hdr-left">
-    <img class="hdr-logo" src="https://typetest.sanchaya.net/img/app-icon-light.png"
-         alt="Sanchaya" onerror="this.style.display='none'">
+    <img class="hdr-logo" src="https://fonts.sanchaya.net/img/app-icon-light.png" alt="Sanchaya">
+    <img class="hdr-logo-wordmark" src="https://fonts.sanchaya.net/img/sanchaya-logo.png" alt="Sanchaya">
+    <div class="hdr-logo-divider"></div>
     <div>
       <div class="hdr-title">Font Quality Inspector · ಫಾಂಟ್ ಗುಣಮಟ್ಟ ತಪಾಸಣೆ</div>
       <div class="hdr-sub">Kannada Revival Font Checker — Sanchaya Font Tools</div>
