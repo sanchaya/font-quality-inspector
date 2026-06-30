@@ -2,8 +2,8 @@ node_modules/
 *.log
 npm-debug.log*
 .DS_Store
-reports/*.json
-reports/*.html
+reports/
+font-checker/reports/
 *.json.bak
 
 # Local font clones (fonts are fetched from fonts.sanchaya.net at runtime)

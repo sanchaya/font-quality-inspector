@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kannada Font Quality Inspector · Sanchaya</title>
+<meta name="description" content="Open-source tool to inspect Unicode coverage, OpenType shaping features, GSUB/GPOS rules, glyph metrics and metadata for Kannada revival fonts.">
+<meta property="og:title" content="Kannada Font Quality Inspector · Sanchaya">
+<meta property="og:description" content="Inspect Unicode coverage, OpenType features, GSUB/GPOS tables, and metadata for Kannada revival fonts.">
+<style>
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --border: #334155;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --accent: #f59e0b;
+  --accent2: #3b82f6;
+  --pass: #22c55e;
+  --r: 12px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+a { color: inherit; text-decoration: none; }
+
+/* ── Hero ── */
+.hero {
+  padding: 64px 24px 48px;
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.hero-kn {
+  font-size: 48px;
+  line-height: 1;
+  margin-bottom: 16px;
+  opacity: .85;
+  letter-spacing: .02em;
+}
+.hero-title {
+  font-size: clamp(26px, 5vw, 38px);
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 14px;
+}
+.hero-title span { color: var(--accent); }
+.hero-sub {
+  font-size: 16px;
+  color: var(--muted);
+  max-width: 520px;
+  margin: 0 auto 32px;
+}
+.badge-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--surface);
+}
+.badge.green  { border-color: #16a34a; color: #4ade80; background: #052e16; }
+.badge.blue   { border-color: #1d4ed8; color: #93c5fd; background: #0c1a3a; }
+.badge.yellow { border-color: #b45309; color: #fcd34d; background: #1c1200; }
+
+/* ── Tool cards ── */
+.tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  max-width: 900px;
+  margin: 0 auto 64px;
+  padding: 0 24px;
+}
+.tool-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 28px;
+  transition: border-color .2s, transform .15s;
+  display: flex;
+  flex-direction: column;
+}
+.tool-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.tool-card.primary { border-color: rgba(245,158,11,.3); background: #1a1500; }
+.tool-card.primary:hover { border-color: var(--accent); }
+.tc-icon { font-size: 32px; margin-bottom: 14px; }
+.tc-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.tc-desc { font-size: 13px; color: var(--muted); flex: 1; margin-bottom: 20px; line-height: 1.7; }
+.tc-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 20px; }
+.tc-tag {
+  font-size: 10px; font-weight: 600;
+  padding: 2px 7px; border-radius: 8px;
+  background: rgba(255,255,255,.06); color: var(--muted);
+}
+.tc-btn {
+  display: inline-flex; align-items: center; gap-6px;
+  padding: 10px 20px; border-radius: 8px;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: .15s;
+  text-align: center; justify-content: center;
+}
+.tc-btn.primary { background: var(--accent); color: #000; }
+.tc-btn.primary:hover { background: #fbbf24; }
+.tc-btn.secondary { background: rgba(255,255,255,.07); color: var(--text); border: 1px solid var(--border); }
+.tc-btn.secondary:hover { background: rgba(255,255,255,.12); }
+
+/* ── Features section ── */
+.features {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 56px 24px;
+}
+.features-inner { max-width: 900px; margin: 0 auto; }
+.section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin-bottom: 32px; text-align: center; }
+.feat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+.feat-item {
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.feat-icon {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: rgba(245,158,11,.1); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.feat-name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.feat-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* ── CLI section ── */
+.cli-section { max-width: 760px; margin: 56px auto; padding: 0 24px; }
+.cli-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.cli-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+.code-block {
+  background: #020817;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px 24px;
+  font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 2;
+  overflow-x: auto;
+}
+.cmd-comment { color: #475569; }
+.cmd-kw { color: #f59e0b; }
+.cmd-flag { color: #93c5fd; }
+.cmd-path { color: #86efac; }
+
+/* ── Fonts section ── */
+.fonts-section { max-width: 900px; margin: 0 auto 64px; padding: 0 24px; }
+.fonts-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.fonts-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+.font-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.font-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.font-item-name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.font-item-designer { font-size: 11px; color: var(--muted); }
+.font-item-count { font-size: 11px; color: var(--accent); margin-top: 4px; font-weight: 600; }
+
+/* ── Footer ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 28px 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+footer a { color: var(--muted); }
+footer a:hover { color: var(--text); }
+
+@media (max-width: 600px) {
+  .hero-kn { font-size: 32px; }
+  .tools { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="hero-kn">ಕನ್ನಡ ಅಕ್ಷರ ತಪಾಸಣೆ</div>
+  <h1 class="hero-title">Kannada Font <span>Quality Inspector</span></h1>
+  <p class="hero-sub">Open-source tools to inspect Unicode coverage, OpenType shaping rules, GSUB/GPOS tables, glyph metrics, and metadata for Kannada revival fonts.</p>
+  <div class="badge-row">
+    <span class="badge green">✓ No installation needed</span>
+    <span class="badge blue">opentype.js</span>
+    <span class="badge yellow">Sanchaya fonts</span>
+    <span class="badge">Node CLI included</span>
+  </div>
+</section>
+
+<!-- ── Tool cards ── -->
+<div class="tools">
+
+  <div class="tool-card primary">
+    <div class="tc-icon">🗺</div>
+    <div class="tc-title">Sanchaya Font Portal</div>
+    <div class="tc-desc">
+      Automatically loads all Sanchaya Kannada fonts from fonts.sanchaya.net and shows a full quality dashboard — scores, glyph grids, feature tables, GSUB/GPOS lookups — for every font side by side.
+    </div>
+    <div class="tc-tags">
+      <span class="tc-tag">All 11 fonts</span>
+      <span class="tc-tag">Auto-fetch</span>
+      <span class="tc-tag">Score cards</span>
+      <span class="tc-tag">Export JSON</span>
+    </div>
+    <a class="tc-btn primary" href="sanchaya-font-portal.html">Open Portal →</a>
+  </div>
+
+  <div class="tool-card">
+    <div class="tc-icon">🔍</div>
+    <div class="tc-title">Single Font Inspector</div>
+    <div class="tc-desc">
+      Drag and drop any local .ttf or .otf file for instant deep analysis. Inspect every Unicode codepoint, OpenType feature, lookup rule, mark anchor, and metadata field with full glyph inventory.
+    </div>
+    <div class="tc-tags">
+      <span class="tc-tag">Drag & drop</span>
+      <span class="tc-tag">Local fonts</span>
+      <span class="tc-tag">Import/compare JSON</span>
+      <span class="tc-tag">8 tabs</span>
+    </div>
+    <a class="tc-btn secondary" href="font-quality-inspector.html">Open Inspector →</a>
+  </div>
+
+</div>
+
+<!-- ── Features ── -->
+<section class="features">
+  <div class="features-inner">
+    <div class="section-title">What gets checked</div>
+    <div class="feat-grid">
+      <div class="feat-item">
+        <div class="feat-icon">🔡</div>
+        <div>
+          <div class="feat-name">Unicode Coverage</div>
+          <div class="feat-desc">All 88 codepoints in U+0C80–U+0CFF including 12 revival/archaic characters. Required vs optional tracked separately.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">⚙️</div>
+        <div>
+          <div class="feat-name">OpenType Features</div>
+          <div class="feat-desc">All 21 GSUB/GPOS shaping features — nukt, akhn, blwf, vatu, cjct, pres, abvs, blws, psts, haln, mark and more.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">📐</div>
+        <div>
+          <div class="feat-name">GSUB Rules</div>
+          <div class="feat-desc">Per-feature lookup tables with rule counts, substitution types, and feature→lookup index mapping.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">🎯</div>
+        <div>
+          <div class="feat-name">GPOS & Mark Anchors</div>
+          <div class="feat-desc">Mark-to-Base (type 4) and Mark-to-Mark (type 6) lookups with anchor count. Critical for vowel sign attachment.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">📋</div>
+        <div>
+          <div class="feat-name">Metadata</div>
+          <div class="feat-desc">Name table fields, OS/2 weight/width class, Unicode range bits, typo/win metrics, italic angle.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">📊</div>
+        <div>
+          <div class="feat-name">Quality Score</div>
+          <div class="feat-desc">100-point score across coverage (40), features (30), scripts (10), metadata (10), and revival support (10). Grades A–F.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">🔬</div>
+        <div>
+          <div class="feat-name">Cross-font Comparison</div>
+          <div class="feat-desc">Compare any two fonts side by side. Generates a fix plan with missing GSUB rules, glyph gaps, and sample rules from the reference font as a blueprint.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <div class="feat-icon">📁</div>
+        <div>
+          <div class="feat-name">Glyph Inventory</div>
+          <div class="feat-desc">Full glyph list with advance width statistics, empty glyph detection, and outlier flagging for Kannada glyphs.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CLI ── -->
+<section class="cli-section">
+  <h2 class="cli-title">Node.js CLI</h2>
+  <p class="cli-sub">For batch processing, CI pipelines, or local workflows. Saves timestamped HTML + JSON reports.</p>
+  <div class="code-block">
+<span class="cmd-comment"># Install</span>
+<span class="cmd-kw">git clone</span> https://github.com/sanchaya/font-quality-inspector.git
+<span class="cmd-kw">cd</span> font-quality-inspector/font-checker &amp;&amp; <span class="cmd-kw">npm install</span>
+
+<span class="cmd-comment"># Analyze a font</span>
+<span class="cmd-kw">node</span> index.js <span class="cmd-path">fonts/kan_gtn/fonts/ttf/KarnataGTN-Regular.ttf</span>
+
+<span class="cmd-comment"># Analyze a whole directory</span>
+<span class="cmd-kw">node</span> index.js <span class="cmd-path">fonts/kan_gtn/fonts/ttf/</span>
+
+<span class="cmd-comment"># Cross-font comparison: why does Font B render better?</span>
+<span class="cmd-kw">node</span> index.js <span class="cmd-path">fontA.ttf</span> <span class="cmd-flag">--compare-font</span> <span class="cmd-path">fontB.ttf</span>
+
+<span class="cmd-comment"># Version diff against a previous report</span>
+<span class="cmd-kw">node</span> index.js <span class="cmd-path">font.ttf</span> <span class="cmd-flag">--compare</span> <span class="cmd-path">reports/font_latest.json</span>
+  </div>
+</section>
+
+<!-- ── Fonts covered ── -->
+<section class="fonts-section">
+  <h2 class="fonts-title">Sanchaya Fonts Covered</h2>
+  <p class="fonts-sub">All fonts from <a href="https://fonts.sanchaya.net" style="color:var(--accent2)">fonts.sanchaya.net</a> are included in the portal.</p>
+  <div class="font-list">
+    <div class="font-item">
+      <div class="font-item-name">Karnata GTN</div>
+      <div class="font-item-designer">Arun C Kallappanavar</div>
+      <div class="font-item-count">7 weights + variable</div>
+    </div>
+    <div class="font-item">
+      <div class="font-item-name">Karnata German Mission Press</div>
+      <div class="font-item-designer">Arun C Kallappanavar</div>
+      <div class="font-item-count">Revival · Mangaluru prints</div>
+    </div>
+    <div class="font-item">
+      <div class="font-item-name">Karnata Wesleyan Mission Press</div>
+      <div class="font-item-designer">Arun C Kallappanavar</div>
+      <div class="font-item-count">Revival · Bengaluru prints</div>
+    </div>
+    <div class="font-item">
+      <div class="font-item-name">Karnata Bandipur</div>
+      <div class="font-item-designer">Vargas Beltrán / Ravichandran / Kallappanavar</div>
+      <div class="font-item-count">Display · Kannada + Latin</div>
+    </div>
+    <div class="font-item">
+      <div class="font-item-name">Karnata F Kittel</div>
+      <div class="font-item-designer">Pandit / Shetty / Satish A.G.</div>
+      <div class="font-item-count">Revival · Basel Mission Press 1830–1900</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <a href="https://github.com/sanchaya/font-quality-inspector" target="_blank">GitHub ↗</a>
+  <a href="https://fonts.sanchaya.net" target="_blank">fonts.sanchaya.net ↗</a>
+  <a href="https://typetest.sanchaya.net" target="_blank">typetest.sanchaya.net ↗</a>
+  <span>MIT License · Sanchaya</span>
+</footer>
+
+</body>
+</html>
