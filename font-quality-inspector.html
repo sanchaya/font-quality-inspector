@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Font Quality Inspector — ಫಾಂಟ್ ಗುಣಮಟ್ಟ ತಪಾಸಣೆ</title>
-<link rel="icon" type="image/png" href="img/app-icon-light.png">
-<link rel="apple-touch-icon" href="img/app-icon-light.png">
+<link rel="icon" href="img/favicon.ico">
+<link rel="apple-touch-icon" href="img/sanchaya-logo.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
 <style>
 :root {
@@ -14,22 +14,22 @@
   --pass:#16a34a; --fail:#dc2626; --warn:#d97706; --info:#2563eb;
   --pass-bg:#dcfce7; --fail-bg:#fee2e2; --warn-bg:#fef9c3; --info-bg:#dbeafe;
   --r:8px; --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --header-bg:#0f172a;
+  --header-bg:#ffffff;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh}
 
 /* ── Header ── */
-.hdr{background:var(--header-bg);color:#fff;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:100}
+.hdr{background:var(--header-bg);color:var(--text);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .hdr-left{display:flex;align-items:center;gap:14px}
 .hdr-logo{height:26px;width:26px;object-fit:contain}
 .hdr-logo-wordmark{height:18px;object-fit:contain;opacity:.85}
-.hdr-logo-divider{width:1px;height:18px;background:rgba(255,255,255,.2)}
+.hdr-logo-divider{width:1px;height:18px;background:var(--border)}
 .hdr-title{font-size:15px;font-weight:700;letter-spacing:.01em}
-.hdr-sub{font-size:11px;color:#94a3b8;margin-top:1px}
+.hdr-sub{font-size:11px;color:var(--muted);margin-top:1px}
 .hdr-right{display:flex;align-items:center;gap:8px}
 .btn{padding:6px 14px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s}
-.btn-ghost{background:rgba(255,255,255,.1);color:#fff}.btn-ghost:hover{background:rgba(255,255,255,.18)}
+.btn-ghost{background:var(--surface);color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{background:var(--border)}
 .btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{opacity:.88}
 
 /* ── Drop Zone ── */
@@ -200,8 +200,8 @@ code{font-family:monospace;background:var(--surface);border:1px solid var(--bord
 <!-- ── Header ──────────────────────────────────────────────────────── -->
 <header class="hdr">
   <div class="hdr-left">
-    <img class="hdr-logo" src="img/app-icon-light.png" alt="Sanchaya">
-    <img class="hdr-logo-wordmark" src="img/sanchaya-logo.png" alt="Sanchaya">
+    <img class="hdr-logo" src="img/sanchaya-logo.png" alt="Sanchaya">
+    <img class="hdr-logo-wordmark" src="img/app-icon-light.png" alt="Sanchaya">
     <div class="hdr-logo-divider"></div>
     <div>
       <div class="hdr-title">Font Quality Inspector · ಫಾಂಟ್ ಗುಣಮಟ್ಟ ತಪಾಸಣೆ</div>

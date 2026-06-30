@@ -7,19 +7,19 @@
 <meta name="description" content="Open-source tool to inspect Unicode coverage, OpenType shaping features, GSUB/GPOS rules, glyph metrics and metadata for Kannada revival fonts.">
 <meta property="og:title" content="Kannada Font Quality Inspector · Sanchaya">
 <meta property="og:description" content="Inspect Unicode coverage, OpenType features, GSUB/GPOS tables, and metadata for Kannada revival fonts.">
-<meta property="og:image" content="img/app-icon-light.png">
-<link rel="icon" type="image/png" href="img/app-icon-light.png">
-<link rel="apple-touch-icon" href="img/app-icon-light.png">
+<meta property="og:image" content="img/sanchaya-logo.png">
+<link rel="icon" href="img/favicon.ico">
+<link rel="apple-touch-icon" href="img/sanchaya-logo.png">
 <style>
 :root {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --border: #334155;
-  --text: #f1f5f9;
-  --muted: #94a3b8;
-  --accent: #f59e0b;
-  --accent2: #3b82f6;
-  --pass: #22c55e;
+  --bg: #ffffff;
+  --surface: #f7f7f5;
+  --border: #e5e7eb;
+  --text: #111827;
+  --muted: #6b7280;
+  --accent: #c97c2e;
+  --accent2: #2563eb;
+  --pass: #16a34a;
   --r: 12px;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -38,7 +38,7 @@ a { color: inherit; text-decoration: none; }
   display: flex; align-items: center; gap: 12px;
   padding: 14px 28px;
   border-bottom: 1px solid var(--border);
-  background: rgba(15,23,42,.8);
+  background: rgba(255,255,255,.92);
   backdrop-filter: blur(8px);
   position: sticky; top: 0; z-index: 50;
 }
@@ -99,9 +99,9 @@ a { color: inherit; text-decoration: none; }
   color: var(--muted);
   background: var(--surface);
 }
-.badge.green  { border-color: #16a34a; color: #4ade80; background: #052e16; }
-.badge.blue   { border-color: #1d4ed8; color: #93c5fd; background: #0c1a3a; }
-.badge.yellow { border-color: #b45309; color: #fcd34d; background: #1c1200; }
+.badge.green  { border-color: #bbf7d0; color: #15803d; background: #f0fdf4; }
+.badge.blue   { border-color: #bfdbfe; color: #1d4ed8; background: #eff6ff; }
+.badge.yellow { border-color: #fde68a; color: #92400e; background: #fffbeb; }
 
 /* ── Tool cards ── */
 .tools {
@@ -125,7 +125,7 @@ a { color: inherit; text-decoration: none; }
   border-color: var(--accent);
   transform: translateY(-2px);
 }
-.tool-card.primary { border-color: rgba(245,158,11,.3); background: #1a1500; }
+.tool-card.primary { border-color: rgba(201,124,46,.25); background: #fffbf5; }
 .tool-card.primary:hover { border-color: var(--accent); }
 .tc-icon { font-size: 32px; margin-bottom: 14px; }
 .tc-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
@@ -134,7 +134,8 @@ a { color: inherit; text-decoration: none; }
 .tc-tag {
   font-size: 10px; font-weight: 600;
   padding: 2px 7px; border-radius: 8px;
-  background: rgba(255,255,255,.06); color: var(--muted);
+  background: var(--surface); color: var(--muted);
+  border: 1px solid var(--border);
 }
 .tc-btn {
   display: inline-flex; align-items: center; gap-6px;
@@ -143,10 +144,10 @@ a { color: inherit; text-decoration: none; }
   cursor: pointer; transition: .15s;
   text-align: center; justify-content: center;
 }
-.tc-btn.primary { background: var(--accent); color: #000; }
-.tc-btn.primary:hover { background: #fbbf24; }
-.tc-btn.secondary { background: rgba(255,255,255,.07); color: var(--text); border: 1px solid var(--border); }
-.tc-btn.secondary:hover { background: rgba(255,255,255,.12); }
+.tc-btn.primary { background: var(--accent); color: #fff; }
+.tc-btn.primary:hover { background: #a8621e; }
+.tc-btn.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.tc-btn.secondary:hover { background: var(--border); }
 
 /* ── Features section ── */
 .features {
@@ -167,7 +168,7 @@ a { color: inherit; text-decoration: none; }
 }
 .feat-icon {
   width: 36px; height: 36px; border-radius: 8px;
-  background: rgba(245,158,11,.1); color: var(--accent);
+  background: rgba(201,124,46,.08); color: var(--accent);
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; flex-shrink: 0;
 }
@@ -179,16 +180,17 @@ a { color: inherit; text-decoration: none; }
 .cli-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
 .cli-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
 .code-block {
-  background: #020817;
-  border: 1px solid var(--border);
+  background: #1e293b;
+  border: 1px solid #334155;
   border-radius: var(--r);
   padding: 20px 24px;
   font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
   font-size: 13px;
   line-height: 2;
   overflow-x: auto;
+  color: #e2e8f0;
 }
-.cmd-comment { color: #475569; }
+.cmd-comment { color: #64748b; }
 .cmd-kw { color: #f59e0b; }
 .cmd-flag { color: #93c5fd; }
 .cmd-path { color: #86efac; }
@@ -237,8 +239,8 @@ footer a:hover { color: var(--text); }
 
 <!-- ── Nav ── -->
 <nav class="nav">
-  <img class="nav-logo-icon" src="img/app-icon-light.png" alt="Sanchaya">
-  <img class="nav-logo-wordmark" src="img/sanchaya-logo.png" alt="Sanchaya">
+  <img class="nav-logo-icon" src="img/sanchaya-logo.png" alt="Sanchaya">
+  <img class="nav-logo-wordmark" src="img/app-icon-light.png" alt="Sanchaya">
   <div class="nav-divider"></div>
   <span class="nav-title">Font Quality Inspector</span>
   <div class="nav-right">
@@ -250,8 +252,8 @@ footer a:hover { color: var(--text); }
 <!-- ── Hero ── -->
 <section class="hero">
   <div class="hero-logo-row">
-    <img class="hero-logo-icon" src="img/app-icon-light.png" alt="Sanchaya">
-    <img class="hero-logo-wordmark" src="img/sanchaya-logo.png" alt="Sanchaya">
+    <img class="hero-logo-icon" src="img/sanchaya-logo.png" alt="Sanchaya">
+    <img class="hero-logo-wordmark" src="img/app-icon-light.png" alt="Sanchaya">
   </div>
   <div class="hero-kn">ಕನ್ನಡ ಅಕ್ಷರ ತಪಾಸಣೆ</div>
   <h1 class="hero-title">Kannada Font <span>Quality Inspector</span></h1>
